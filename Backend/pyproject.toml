@@ -1,0 +1,45 @@
+[project]
+name = "accident-detection-backend"
+version = "1.0.0"
+description = "Vehicle crash detection system using YOLOv8 + LSTM"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+
+dependencies = [
+    "fastapi==0.109.0",
+    "uvicorn[standard]==0.27.0",
+    "python-multipart==0.0.6",
+    "sqlalchemy==2.0.25",
+    "torch==2.2.0",
+    "torchvision==0.17.0",
+    "ultralytics==8.1.0",
+    "opencv-python==4.9.0.80",
+    "numpy==1.26.3",
+    "python-dotenv==1.0.0",
+    "pydantic==2.5.3",
+    "pydantic-settings==2.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.3",
+    "pytest-asyncio==0.23.3",
+    "httpx==0.26.0",
+    "ruff==0.1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"

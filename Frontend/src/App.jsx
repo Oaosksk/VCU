@@ -59,8 +59,7 @@ function App() {
 
     const handleRetry = () => {
         if (uploadedFile) {
-            setCurrentState(APP_STATES.PROCESSING)
-            setError(null)
+            handleFileUpload(uploadedFile)
         } else {
             handleReset()
         }
@@ -69,7 +68,7 @@ function App() {
     const renderCurrentState = () => {
         switch (currentState) {
             case APP_STATES.UPLOAD:
-                return <UploadState onFileUpload={handleFileUpload} />
+                return <UploadState onFileUpload={handleFileUpload} showToast={showToast} />
 
             case APP_STATES.PROCESSING:
                 return (

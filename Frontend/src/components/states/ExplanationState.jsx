@@ -105,11 +105,11 @@ const ExplanationState = ({ result, onBack, onReset }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <TechnicalDetail
                             label="Model Architecture"
-                            value="Hybrid CNN-LSTM"
+                            value="YOLOv8 + Pattern Analysis"
                         />
                         <TechnicalDetail
-                            label="Backbone"
-                            value="ResNet-50"
+                            label="Detection Method"
+                            value="Spatio-Temporal Analysis"
                         />
                         <TechnicalDetail
                             label="Frames Analyzed"

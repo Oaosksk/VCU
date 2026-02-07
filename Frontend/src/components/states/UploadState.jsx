@@ -2,12 +2,17 @@ import FileDropzone from '../ui/FileDropzone'
 import { validateVideoFile } from '../../utils/fileValidation'
 import { FILE_CONFIG } from '../../utils/constants'
 
-const UploadState = ({ onFileUpload }) => {
+const UploadState = ({ onFileUpload, showToast }) => {
     const handleFileSelect = (file) => {
         const validation = validateVideoFile(file)
 
         if (!validation.valid) {
-            alert(validation.error)
+            // Use toast notification instead of alert
+            if (showToast) {
+                showToast(validation.error, 'error')
+            } else {
+                alert(validation.error)
+            }
             return
         }
 

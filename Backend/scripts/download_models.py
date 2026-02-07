@@ -11,10 +11,27 @@ def download_models():
     model_dir.mkdir(parents=True, exist_ok=True)
     
     print("Downloading YOLOv8s model...")
-    # YOLOv8 will auto-download on first use
-    
-    print(f"Models will be stored in: {model_dir}")
-    print("Models will be downloaded automatically on first inference")
+    try:
+        from ultralytics import YOLO
+        
+        # Download YOLOv8s model
+        model_path = model_dir / "yolov8s.pt"
+        if not model_path.exists():
+            print("Downloading YOLOv8s weights...")
+            model = YOLO('yolov8s.pt')
+            # Move to storage directory
+            import shutil
+            shutil.move('yolov8s.pt', str(model_path))
+            print(f"✅ YOLOv8s model downloaded to {model_path}")
+        else:
+            print(f"✅ YOLOv8s model already exists at {model_path}")
+        
+        print(f"\nModels directory: {model_dir}")
+        print("Note: LSTM model needs to be trained separately")
+        
+    except Exception as e:
+        print(f"❌ Error downloading models: {e}")
+        print("Models will be downloaded automatically on first inference")
 
 if __name__ == "__main__":
     download_models()

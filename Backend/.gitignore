@@ -10,6 +10,7 @@ uv.lock
 .idea/
 .env
 .env.local
+.env.example
 *.db
 *.sqlite
 *.sqlite3
@@ -26,3 +27,4 @@ logs/
 .coverage
 .DS_Store
 Thumbs.db
+*.md

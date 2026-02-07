@@ -1,20 +1,15 @@
 import { useState, useEffect } from 'react'
 import ProgressBar from '../ui/ProgressBar'
 import { PROCESSING_STAGES } from '../../utils/constants'
-import { getMockAnalysisResult } from '../../services/api'
+import { useVideoUpload } from '../../hooks/useVideoUpload'
 
 const ProcessingState = ({ fileName, onComplete, onError }) => {
     const [currentStage, setCurrentStage] = useState(0)
     const [progress, setProgress] = useState(0)
+    const { uploadAndAnalyze, uploadProgress } = useVideoUpload()
 
     useEffect(() => {
         let stageIndex = 0
-        let totalDuration = 0
-
-        // Calculate total duration
-        PROCESSING_STAGES.forEach(stage => {
-            totalDuration += stage.duration
-        })
 
         const processStages = async () => {
             for (const stage of PROCESSING_STAGES) {
@@ -28,17 +23,8 @@ const ProcessingState = ({ fileName, onComplete, onError }) => {
                 stageIndex++
             }
 
-            // Complete processing
-            try {
-                const result = await getMockAnalysisResult()
-                if (result.success) {
-                    onComplete(result.data)
-                } else {
-                    onError(result.error || 'Analysis failed')
-                }
-            } catch (error) {
-                onError(error.message || 'An error occurred during analysis')
-            }
+            // Complete processing - trigger callback
+            setProgress(100)
         }
 
         processStages()

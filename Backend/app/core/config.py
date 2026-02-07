@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     
+    GROQ_API_KEY: str = ""
+    
     @property
     def cors_origins(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]

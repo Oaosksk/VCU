@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Button from '../ui/Button'
 import StatusBadge from '../ui/StatusBadge'
-import { getMockExplanation } from '../../services/api'
+import { getExplanation } from '../../services/api'
 
 const ExplanationState = ({ result, onBack, onReset }) => {
     const [explanation, setExplanation] = useState('')
@@ -11,9 +11,11 @@ const ExplanationState = ({ result, onBack, onReset }) => {
         const fetchExplanation = async () => {
             setIsLoading(true)
             try {
-                const response = await getMockExplanation()
+                const response = await getExplanation(result?.id)
                 if (response.success) {
                     setExplanation(response.explanation)
+                } else {
+                    setExplanation('Failed to load explanation. Please try again.')
                 }
             } catch (error) {
                 console.error('Failed to fetch explanation:', error)
@@ -23,7 +25,9 @@ const ExplanationState = ({ result, onBack, onReset }) => {
             }
         }
 
-        fetchExplanation()
+        if (result?.id) {
+            fetchExplanation()
+        }
     }, [result])
 
     return (

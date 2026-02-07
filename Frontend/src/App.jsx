@@ -8,6 +8,7 @@ import ResultState from './components/states/ResultState'
 import ExplanationState from './components/states/ExplanationState'
 import ErrorState from './components/states/ErrorState'
 import { useToast } from './hooks/useToast.jsx'
+import { useVideoUpload } from './hooks/useVideoUpload'
 import { APP_STATES } from './utils/constants'
 
 function App() {
@@ -16,17 +17,27 @@ function App() {
     const [analysisResult, setAnalysisResult] = useState(null)
     const [error, setError] = useState(null)
     const { showToast, ToastContainer } = useToast()
+    const { uploadAndAnalyze } = useVideoUpload()
 
-    const handleFileUpload = (file) => {
+    const handleFileUpload = async (file) => {
         setUploadedFile(file)
         setCurrentState(APP_STATES.PROCESSING)
-        showToast('Video uploaded successfully! Starting analysis...', 'success')
-    }
-
-    const handleAnalysisComplete = (result) => {
-        setAnalysisResult(result)
-        setCurrentState(APP_STATES.RESULT)
-        showToast('Analysis completed successfully!', 'success')
+        showToast('Uploading video...', 'info')
+        
+        // Call real API
+        await uploadAndAnalyze(
+            file,
+            (result) => {
+                setAnalysisResult(result)
+                setCurrentState(APP_STATES.RESULT)
+                showToast('Analysis completed successfully!', 'success')
+            },
+            (errorMsg) => {
+                setError(errorMsg)
+                setCurrentState(APP_STATES.ERROR)
+                showToast(errorMsg, 'error')
+            }
+        )
     }
 
     const handleViewExplanation = () => {
@@ -64,8 +75,8 @@ function App() {
                 return (
                     <ProcessingState
                         fileName={uploadedFile?.name}
-                        onComplete={handleAnalysisComplete}
-                        onError={handleError}
+                        onComplete={() => {}} // Handled by uploadAndAnalyze callback
+                        onError={() => {}} // Handled by uploadAndAnalyze callback
                     />
                 )
 

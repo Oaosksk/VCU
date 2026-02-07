@@ -27,4 +27,4 @@ logs/
 .coverage
 .DS_Store
 Thumbs.db
-*.md
+.md

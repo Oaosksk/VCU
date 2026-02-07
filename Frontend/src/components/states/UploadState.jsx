@@ -23,10 +23,10 @@ const UploadState = ({ onFileUpload, showToast }) => {
         <div className="text-center space-y-8">
             {/* Header */}
             <div className="space-y-3">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl font-bold text-white">
                     Upload Video for Analysis
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                <p className="text-gray-400 max-w-2xl mx-auto">
                     Upload a traffic video to detect potential accidents using our advanced
                     spatio-temporal deep learning model
                 </p>

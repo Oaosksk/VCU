@@ -22,10 +22,10 @@ const ErrorState = ({ error, onRetry, onReset }) => {
 
             {/* Header */}
             <div className="space-y-3">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl font-bold text-white">
                     Analysis Failed
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-400">
                     We encountered an error while processing your video
                 </p>
             </div>
@@ -106,7 +106,7 @@ const ErrorState = ({ error, onRetry, onReset }) => {
             </div>
 
             {/* Support */}
-            <p className="text-sm text-gray-500 dark:text-gray-500">
+            <p className="text-sm text-gray-500">
                 If the problem persists, please contact support
             </p>
         </div>

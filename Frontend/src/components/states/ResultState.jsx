@@ -6,7 +6,7 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
     if (!result) {
         return (
             <div className="text-center">
-                <p className="text-gray-600 dark:text-gray-400">No results available</p>
+                <p className="text-gray-400">No results available</p>
             </div>
         )
     }
@@ -15,7 +15,7 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center space-y-4">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl font-bold text-white">
                     Analysis Complete
                 </h2>
             </div>
@@ -25,7 +25,7 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
                 <div className="space-y-6">
                     {/* Status */}
                     <div>
-                        <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                        <h3 className="text-sm font-medium text-gray-400 mb-2">
                             Detection Result
                         </h3>
                         <StatusBadge status={result.status} confidence={result.confidence} />
@@ -33,19 +33,19 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
 
                     {/* Confidence Score */}
                     <div>
-                        <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
+                        <h3 className="text-sm font-medium text-gray-400 mb-3">
                             Confidence Score
                         </h3>
                         <div className="relative pt-1">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                                <span className="text-2xl font-bold text-white">
                                     {(result.confidence * 100).toFixed(1)}%
                                 </span>
-                                <span className="text-sm text-gray-500 dark:text-gray-400">
+                                <span className="text-sm text-gray-400">
                                     {result.confidence >= 0.8 ? 'High' : result.confidence >= 0.5 ? 'Medium' : 'Low'}
                                 </span>
                             </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            <div className="w-full bg-gray-700 rounded-full h-3">
                                 <div
                                     className={`h-full rounded-full transition-all duration-500 ${result.confidence >= 0.8
                                         ? 'bg-gradient-to-r from-green-400 to-green-600'
@@ -83,7 +83,7 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
 
                     {/* Timestamp */}
                     <div className="pt-4 border-t border-slate-600">
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                        <p className="text-xs text-gray-500">
                             Analyzed at: {formatTimestamp(result.timestamp)}
                         </p>
                     </div>
@@ -105,10 +105,10 @@ const ResultState = ({ result, onViewExplanation, onReset }) => {
 
 const DetailItem = ({ label, value }) => (
     <div>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+        <p className="text-xs font-medium text-gray-400 mb-1">
             {label}
         </p>
-        <p className="text-sm text-gray-900 dark:text-white font-medium">
+        <p className="text-sm text-white font-medium">
             {value}
         </p>
     </div>

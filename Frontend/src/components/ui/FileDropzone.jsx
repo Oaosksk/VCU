@@ -86,14 +86,14 @@ const FileDropzone = ({ onFileSelect, accept, maxSize }) => {
 
                 {/* Text */}
                 <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                    <p className="text-lg font-semibold text-white mb-1">
                         {isDragging ? 'Drop video here' : 'Drop video here or click to browse'}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-400">
                         Supported formats: MP4, AVI, MOV
                     </p>
                     {maxSize && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                             Maximum file size: {formatFileSize(maxSize)}
                         </p>
                     )}

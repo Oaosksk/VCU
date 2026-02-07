@@ -57,7 +57,7 @@ const StatusBadge = ({ status, confidence }) => {
                 {config.label}
             </span>
             {confidence !== undefined && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-gray-400">
                     {(confidence * 100).toFixed(1)}% confidence
                 </span>
             )}

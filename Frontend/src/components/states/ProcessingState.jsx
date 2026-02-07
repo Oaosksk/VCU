@@ -73,10 +73,10 @@ const ProcessingState = ({ fileName, onComplete, onError }) => {
                     </svg>
                 </div>
 
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl font-bold text-white">
                     Analyzing Video
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-400">
                     Processing: <span className="font-semibold">{fileName}</span>
                 </p>
             </div>
@@ -149,7 +149,7 @@ const ProcessingState = ({ fileName, onComplete, onError }) => {
             </div>
 
             {/* Info */}
-            <p className="text-sm text-gray-500 dark:text-gray-500">
+            <p className="text-sm text-gray-500">
                 This may take a few moments. Please do not close this window.
             </p>
         </div>

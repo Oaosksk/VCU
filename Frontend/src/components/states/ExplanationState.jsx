@@ -34,10 +34,10 @@ const ExplanationState = ({ result, onBack, onReset }) => {
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center space-y-4">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-3xl font-bold text-white">
                     AI Explanation
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-400">
                     Understanding the analysis results
                 </p>
             </div>
@@ -46,7 +46,7 @@ const ExplanationState = ({ result, onBack, onReset }) => {
             <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700">
                 <div className="flex items-center justify-between">
                     <StatusBadge status={result?.status} confidence={result?.confidence} />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-sm text-gray-400">
                         Result ID: {result?.id}
                     </span>
                 </div>
@@ -57,7 +57,7 @@ const ExplanationState = ({ result, onBack, onReset }) => {
                 {isLoading ? (
                     <div className="text-center py-12">
                         <div className="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full spinner mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">
+                        <p className="text-gray-400">
                             Generating AI explanation...
                         </p>
                     </div>

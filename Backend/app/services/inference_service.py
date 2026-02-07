@@ -3,17 +3,23 @@ from datetime import datetime
 from pathlib import Path
 import numpy as np
 import logging
+import time
 
 from app.services.video_service import get_video_path
 from app.ml.models.yolo_detector import YOLODetector
+from app.ml.models.lstm_model import LSTMDetector
 from app.ml.pipeline.frame_extractor import FrameExtractor
 from app.ml.pipeline.preprocessor import FramePreprocessor
+from app.services.confidence_service import TemporalConfidenceAggregator
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 async def analyze_video_file(video_id: str) -> dict:
-    """Analyze video file for accident detection"""
+    """Analyze video file for accident detection using LSTM + Temporal Confidence Aggregation"""
+    start_time = time.time()
+    
     try:
         logger.info(f"Starting analysis for video: {video_id}")
         video_path = get_video_path(video_id)
@@ -22,7 +28,12 @@ async def analyze_video_file(video_id: str) -> dict:
         # Initialize components
         frame_extractor = FrameExtractor()
         yolo_detector = YOLODetector()
-        preprocessor = FramePreprocessor()
+        lstm_detector = LSTMDetector(settings.LSTM_MODEL_PATH)
+        confidence_aggregator = TemporalConfidenceAggregator(
+            window_size=15,
+            spike_threshold=0.3,
+            consistency_threshold=0.6
+        )
         
         # Extract frames
         logger.info("Extracting frames...")
@@ -33,40 +44,73 @@ async def analyze_video_file(video_id: str) -> dict:
         if not frames:
             raise ValueError("No frames extracted from video")
         
-        # Detect objects in frames
+        # Step 1: YOLOv8 Detection (Spatial Features)
         logger.info("Running YOLOv8 detection...")
         detections_per_frame = []
-        vehicle_count = 0
+        lstm_features = []
         
         for idx, frame in enumerate(frames):
             detections = yolo_detector.detect(frame)
             detections_per_frame.append(detections)
             
-            # Count vehicles
-            for det in detections:
-                if det['class_name'] in ['car', 'truck', 'bus', 'motorcycle']:
-                    vehicle_count += 1
+            # Extract features for LSTM
+            vehicles = [d for d in detections if d['class_name'] in ['car', 'truck', 'bus', 'motorcycle']]
+            
+            if vehicles:
+                num_vehicles = len(vehicles)
+                avg_conf = np.mean([d['confidence'] for d in vehicles])
+                bboxes = np.array([d['bbox'] for d in vehicles])
+                bbox_variance = float(np.var(bboxes))
+            else:
+                num_vehicles = 0
+                avg_conf = 0.0
+                bbox_variance = 0.0
+            
+            lstm_features.append([num_vehicles, avg_conf, bbox_variance])
         
-        logger.info(f"Detection complete. Total vehicles detected: {vehicle_count}")
+        logger.info(f"Detection complete. Processing {len(lstm_features)} feature vectors")
         
-        # Analyze patterns for accident detection
-        logger.info("Analyzing patterns...")
-        confidence, status, spatial_features, temporal_features = analyze_patterns(
-            detections_per_frame, frames, video_info
-        )
+        # Step 2: Pad features to fixed length (150 frames)
+        max_frames = 150
+        while len(lstm_features) < max_frames:
+            lstm_features.append([0, 0, 0])
+        lstm_features = np.array(lstm_features[:max_frames])
         
-        logger.info(f"Analysis complete. Status: {status}, Confidence: {confidence:.2f}")
+        # Step 3: LSTM Temporal Analysis
+        logger.info("Running LSTM temporal analysis...")
+        frame_confidences = lstm_detector.predict_sequence(lstm_features)
         
+        # Step 4: Temporal Confidence Aggregation (NOVEL CONTRIBUTION)
+        logger.info("Applying temporal confidence aggregation...")
+        aggregation_result = confidence_aggregator.aggregate(frame_confidences)
+        
+        # Step 5: Final Decision
+        final_confidence = aggregation_result['final_confidence']
+        is_accident = aggregation_result['is_accident']
+        status = "accident" if is_accident else "no_accident"
+        
+        # Calculate inference time
+        inference_time = time.time() - start_time
+        
+        logger.info(f"Analysis complete. Status: {status}, Confidence: {final_confidence:.2f}, Time: {inference_time:.2f}s")
+        
+        # Prepare result
         result = {
             "id": f"result-{video_id}",
             "status": status,
-            "confidence": round(confidence, 2),
+            "confidence": round(final_confidence, 3),
             "timestamp": datetime.now().isoformat(),
+            "inference_time": round(inference_time, 3),
             "details": {
-                "spatialFeatures": spatial_features,
-                "temporalFeatures": temporal_features,
+                "spatialFeatures": f"Detected {len([d for f in detections_per_frame for d in f])} objects across {len(frames)} frames",
+                "temporalFeatures": f"Temporal stability: {aggregation_result['temporal_stability']:.2f}",
                 "frameCount": len(frames),
-                "duration": f"{video_info['duration']:.1f} seconds"
+                "duration": f"{video_info['duration']:.1f} seconds",
+                "temporalStability": round(aggregation_result['temporal_stability'], 3),
+                "spikeFiltered": aggregation_result['spike_filtered'],
+                "eventFrames": aggregation_result['event_frames'],
+                "maxConfidence": round(aggregation_result['max_confidence'], 3),
+                "meanConfidence": round(aggregation_result['mean_confidence'], 3)
             }
         }
         
@@ -78,55 +122,3 @@ async def analyze_video_file(video_id: str) -> dict:
     except Exception as e:
         logger.error(f"Analysis failed for video {video_id}: {str(e)}", exc_info=True)
         raise RuntimeError(f"Analysis failed: {str(e)}")
-
-
-def analyze_patterns(detections_per_frame, frames, video_info):
-    """Analyze detection patterns for accident indicators"""
-    try:
-        # Calculate metrics
-        total_frames = len(frames)
-        if total_frames == 0:
-            return 0.0, "no_accident", "No frames to analyze", "No temporal data"
-        
-        vehicle_frames = sum(1 for dets in detections_per_frame if any(
-            d['class_name'] in ['car', 'truck', 'bus', 'motorcycle'] for d in dets
-        ))
-        
-        # Check for sudden changes in detections
-        detection_counts = [len(dets) for dets in detections_per_frame]
-        if len(detection_counts) > 1:
-            detection_variance = np.var(detection_counts)
-        else:
-            detection_variance = 0
-        
-        # Simple heuristic-based detection (placeholder for LSTM)
-        confidence = 0.0
-        spatial_features = "No significant spatial anomalies detected"
-        temporal_features = "Normal traffic flow patterns observed"
-        
-        # High variance in detections might indicate accident
-        if detection_variance > 5:
-            confidence += 0.3
-            spatial_features = "Irregular object distribution detected"
-            temporal_features = "Sudden changes in scene composition"
-        
-        # Low vehicle presence might indicate aftermath
-        if vehicle_frames < total_frames * 0.3 and vehicle_frames > 0:
-            confidence += 0.2
-            spatial_features = "Sparse vehicle presence detected"
-        
-        # Multiple vehicles in frames
-        avg_vehicles = sum(len(dets) for dets in detections_per_frame) / max(total_frames, 1)
-        if avg_vehicles > 3:
-            confidence += 0.2
-            spatial_features = "Multiple vehicles detected in scene"
-        
-        status = "accident" if confidence > 0.5 else "no_accident"
-        
-        logger.debug(f"Pattern analysis: variance={detection_variance:.2f}, avg_vehicles={avg_vehicles:.2f}")
-        
-        return confidence, status, spatial_features, temporal_features
-        
-    except Exception as e:
-        logger.error(f"Pattern analysis failed: {str(e)}")
-        return 0.0, "no_accident", "Analysis error", "Analysis error"

@@ -1,5 +1,3 @@
-import ThemeToggle from '../ui/ThemeToggle'
-
 const Navbar = () => {
     return (
         <nav className="bg-dark-card border-b border-dark-border shadow-sm">
@@ -31,9 +29,6 @@ const Navbar = () => {
                             </p>
                         </div>
                     </div>
-
-                    {/* Theme Toggle */}
-                    <ThemeToggle />
                 </div>
             </div>
         </nav>

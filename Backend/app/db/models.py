@@ -9,20 +9,20 @@ Base = declarative_base()
 class Video(Base):
     __tablename__ = "videos"
     
-    id = Column(String, primary_key=True)
-    filename = Column(String, nullable=False)
-    filepath = Column(String, nullable=False)
+    id = Column(String(36), primary_key=True)
+    filename = Column(String(255), nullable=False)
+    filepath = Column(String(500), nullable=False)
     size = Column(Integer, nullable=False)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
-    status = Column(String, default="pending")
+    status = Column(String(50), default="pending")
 
 
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"
     
-    id = Column(String, primary_key=True)
-    video_id = Column(String, nullable=False)
-    status = Column(String, nullable=False)
+    id = Column(String(50), primary_key=True)
+    video_id = Column(String(36), nullable=False)
+    status = Column(String(50), nullable=False)
     confidence = Column(Float, nullable=False)
     details = Column(JSON)
     inference_time = Column(Float, nullable=True)  # Added
@@ -35,8 +35,8 @@ class Event(Base):
     __tablename__ = "events"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    video_id = Column(String, ForeignKey('videos.id'), nullable=False)
-    result_id = Column(String, ForeignKey('analysis_results.id'), nullable=False)
+    video_id = Column(String(36), ForeignKey('videos.id'), nullable=False)
+    result_id = Column(String(50), ForeignKey('analysis_results.id'), nullable=False)
     start_frame = Column(Integer, nullable=False)
     end_frame = Column(Integer, nullable=False)
     start_time = Column(Float, nullable=False)  # In seconds

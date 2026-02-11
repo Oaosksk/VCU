@@ -29,6 +29,8 @@ dist-ssr
 .env.production
 .env.example
 
-# Documentation
-*.md
+# Video Files
 *.mp4
+*.avi
+*.mov
+*.mkv

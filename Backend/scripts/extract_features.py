@@ -78,7 +78,8 @@ def process_dataset(dataset_dir, output_file):
     accident_dir = dataset_dir / "accident"
     if accident_dir.exists():
         print(f"\nProcessing accident videos from {accident_dir}...")
-        for video_path in accident_dir.glob("*.mp4"):
+        video_files = list(accident_dir.glob("*.mp4"))[:53]  # Limit to 53 videos
+        for video_path in video_files:
             print(f"  {video_path.name}")
             features = extract_features_from_video(video_path, model)
             X.append(features)

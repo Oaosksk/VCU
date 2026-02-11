@@ -1,3 +1,28 @@
-*.md
+# ML Models & Data (Large Files)
+*.pkl
+*.pt
+*.pth
+*.h5
+*.onnx
+yolov8*.pt
+
+# Dataset & Processing
+dataset/
+frames_output/
+features/
+checkpoints/
+
+# Generated Results
+results/
+output/
+*.csv
+experiments/
+
+# Video Files
 *.mp4
+*.avi
+*.mov
+*.mkv
+
+# Kaggle Downloads
 kaggle-download/

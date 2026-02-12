@@ -9,13 +9,14 @@ export const APP_STATES = {
 
 // File Upload Configuration
 export const FILE_CONFIG = {
-    MAX_SIZE: 100 * 1024 * 1024, // 100MB in bytes
+    MAX_SIZE: 500 * 1024 * 1024, // 500MB in bytes
     ALLOWED_TYPES: {
         'video/mp4': ['.mp4'],
         'video/avi': ['.avi'],
         'video/quicktime': ['.mov'],
+        'video/x-matroska': ['.mkv'],
     },
-    ALLOWED_EXTENSIONS: ['.mp4', '.avi', '.mov']
+    ALLOWED_EXTENSIONS: ['.mp4', '.avi', '.mov', '.mkv']
 }
 
 // API Endpoints

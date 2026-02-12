@@ -5,6 +5,9 @@ import numpy as np
 import logging
 import time
 
+INFERENCE_TIMEOUT_SECONDS = 120  # Abort analysis after 2 minutes
+
+
 from app.services.video_service import get_video_path
 from app.ml.models.yolo_detector import YOLODetector
 from app.ml.models.lstm_model import LSTMDetector
@@ -43,6 +46,11 @@ async def analyze_video_file(video_id: str) -> dict:
         
         if not frames:
             raise ValueError("No frames extracted from video")
+
+        # Timeout guard after frame extraction
+        elapsed = time.time() - start_time
+        if elapsed > INFERENCE_TIMEOUT_SECONDS:
+            raise TimeoutError(f"Inference timed out after {elapsed:.0f}s during frame extraction")
         
         # Step 1: YOLOv8 Detection (Spatial Features)
         logger.info("Running YOLOv8 detection...")
@@ -69,6 +77,11 @@ async def analyze_video_file(video_id: str) -> dict:
             lstm_features.append([num_vehicles, avg_conf, bbox_variance])
         
         logger.info(f"Detection complete. Processing {len(lstm_features)} feature vectors")
+
+        # Timeout guard after YOLO detection
+        elapsed = time.time() - start_time
+        if elapsed > INFERENCE_TIMEOUT_SECONDS:
+            raise TimeoutError(f"Inference timed out after {elapsed:.0f}s during YOLO detection")
         
         # Step 2: Pad features to fixed length (150 frames)
         max_frames = 150
@@ -79,6 +92,11 @@ async def analyze_video_file(video_id: str) -> dict:
         # Step 3: LSTM Temporal Analysis
         logger.info("Running LSTM temporal analysis...")
         frame_confidences = lstm_detector.predict_sequence(lstm_features)
+
+        # Timeout guard after LSTM prediction
+        elapsed = time.time() - start_time
+        if elapsed > INFERENCE_TIMEOUT_SECONDS:
+            raise TimeoutError(f"Inference timed out after {elapsed:.0f}s during LSTM analysis")
         
         # Step 4: Temporal Confidence Aggregation (NOVEL CONTRIBUTION)
         logger.info("Applying temporal confidence aggregation...")
@@ -119,6 +137,18 @@ async def analyze_video_file(video_id: str) -> dict:
     except FileNotFoundError as e:
         logger.error(f"Video not found: {video_id}")
         raise
+    except TimeoutError as e:
+        logger.error(f"Inference timeout for video {video_id}: {e}")
+        raise
     except Exception as e:
         logger.error(f"Analysis failed for video {video_id}: {str(e)}", exc_info=True)
         raise RuntimeError(f"Analysis failed: {str(e)}")
+    finally:
+        # Cleanup GPU memory
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("GPU memory cleared after inference")
+        except ImportError:
+            pass

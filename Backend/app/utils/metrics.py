@@ -142,24 +142,24 @@ class MetricsCalculator:
         }
     
     def print_metrics(self):
-        """Print formatted metrics"""
+        """Log formatted metrics"""
         metrics = self.get_all_metrics()
         
-        print("\n" + "="*60)
-        print("EVALUATION METRICS")
-        print("="*60)
-        print(f"Accuracy:           {metrics['accuracy']:.4f} ({metrics['accuracy']*100:.2f}%)")
-        print(f"Precision:          {metrics['precision']:.4f} ({metrics['precision']*100:.2f}%)")
-        print(f"Recall:             {metrics['recall']:.4f} ({metrics['recall']*100:.2f}%)")
-        print(f"F1-Score:           {metrics['f1_score']:.4f} ({metrics['f1_score']*100:.2f}%)")
-        print(f"Avg Inference Time: {metrics['avg_inference_time']:.4f}s")
-        print("-"*60)
-        print(f"True Positives:     {metrics['true_positives']}")
-        print(f"True Negatives:     {metrics['true_negatives']}")
-        print(f"False Positives:    {metrics['false_positives']}")
-        print(f"False Negatives:    {metrics['false_negatives']}")
-        print(f"Total Samples:      {metrics['total_samples']}")
-        print("="*60 + "\n")
+        logger.info("=" * 60)
+        logger.info("EVALUATION METRICS")
+        logger.info("=" * 60)
+        logger.info(f"Accuracy:           {metrics['accuracy']:.4f} ({metrics['accuracy']*100:.2f}%)")
+        logger.info(f"Precision:          {metrics['precision']:.4f} ({metrics['precision']*100:.2f}%)")
+        logger.info(f"Recall:             {metrics['recall']:.4f} ({metrics['recall']*100:.2f}%)")
+        logger.info(f"F1-Score:           {metrics['f1_score']:.4f} ({metrics['f1_score']*100:.2f}%)")
+        logger.info(f"Avg Inference Time: {metrics['avg_inference_time']:.4f}s")
+        logger.info("-" * 60)
+        logger.info(f"True Positives:     {metrics['true_positives']}")
+        logger.info(f"True Negatives:     {metrics['true_negatives']}")
+        logger.info(f"False Positives:    {metrics['false_positives']}")
+        logger.info(f"False Negatives:    {metrics['false_negatives']}")
+        logger.info(f"Total Samples:      {metrics['total_samples']}")
+        logger.info("=" * 60)
     
     def confusion_matrix(self) -> np.ndarray:
         """

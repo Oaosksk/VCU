@@ -43,3 +43,16 @@ class Event(Base):
     end_time = Column(Float, nullable=False)  # In seconds
     confidence = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AccidentFrame(Base):
+    """Accident frame storage table"""
+    __tablename__ = "accident_frames"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    video_id = Column(String(36), ForeignKey('videos.id'), nullable=False)
+    result_id = Column(String(50), ForeignKey('analysis_results.id'), nullable=False)
+    frame_index = Column(Integer, nullable=False)
+    frame_path = Column(String(500), nullable=False)
+    confidence = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

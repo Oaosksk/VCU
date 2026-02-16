@@ -1,7 +1,7 @@
 """Database CRUD operations"""
 import json
 from sqlalchemy.orm import Session
-from app.db.models import Video, AnalysisResult, Event
+from app.db.models import Video, AnalysisResult, Event, AccidentFrame
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,3 +89,35 @@ def get_result_by_id(db: Session, result_id: str) -> AnalysisResult | None:
 def get_results_by_video(db: Session, video_id: str) -> list[AnalysisResult]:
     """Get all analysis results for a video"""
     return db.query(AnalysisResult).filter(AnalysisResult.video_id == video_id).all()
+
+
+def create_accident_frames(db: Session, video_id: str, result_id: str, 
+                           frames_data: list) -> list[AccidentFrame]:
+    """Save accident frame paths to database"""
+    frames = []
+    for frame_data in frames_data:
+        frame = AccidentFrame(
+            video_id=video_id,
+            result_id=result_id,
+            frame_index=frame_data['index'],
+            frame_path=frame_data['path'],
+            confidence=frame_data.get('confidence', 1.0)
+        )
+        db.add(frame)
+        frames.append(frame)
+    
+    if frames:
+        db.commit()
+        logger.info(f"Saved {len(frames)} accident frames for result {result_id}")
+    
+    return frames
+
+
+def get_accident_frames_by_video(db: Session, video_id: str) -> list[AccidentFrame]:
+    """Get all accident frames for a video"""
+    return db.query(AccidentFrame).filter(AccidentFrame.video_id == video_id).order_by(AccidentFrame.frame_index).all()
+
+
+def get_accident_frames_by_result(db: Session, result_id: str) -> list[AccidentFrame]:
+    """Get all accident frames for a result"""
+    return db.query(AccidentFrame).filter(AccidentFrame.result_id == result_id).order_by(AccidentFrame.frame_index).all()

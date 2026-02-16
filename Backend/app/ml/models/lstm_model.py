@@ -44,8 +44,17 @@ class LSTMDetector:
     """LSTM-based accident detector"""
 
     def __init__(self, model_path=None):
+        from app.core.config import settings
         self.model = None
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Set device based on config
+        if settings.USE_GPU and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            logger.info(f"LSTM using GPU: {torch.cuda.get_device_name(0)}")
+        else:
+            self.device = torch.device('cpu')
+            logger.info("LSTM using CPU")
+        
         self.model_path = model_path
 
         if model_path:

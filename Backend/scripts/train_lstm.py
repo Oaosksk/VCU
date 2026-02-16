@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from pathlib import Path
+from datetime import datetime
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -136,6 +137,65 @@ def train_model(features_file, output_model, epochs=50, batch_size=16, lr=0.001)
     print(f"\nTraining complete!")
     print(f"Best accuracy: {best_acc:.4f}")
     print(f"Model saved to: {output_model}")
+    
+    # Save to database
+    try:
+        import pymysql
+        from app.core.config import settings
+        
+        # Parse DATABASE_URL
+        db_url = settings.DATABASE_URL
+        if 'mysql+pymysql://' in db_url:
+            db_url = db_url.replace('mysql+pymysql://', '')
+            parts = db_url.split('@')
+            user_pass = parts[0].split(':')
+            host_db = parts[1].split('/')
+            host_port = host_db[0].split(':')
+            
+            conn = pymysql.connect(
+                host=host_port[0],
+                user=user_pass[0],
+                password=user_pass[1] if len(user_pass) > 1 else '',
+                database=host_db[1],
+                charset='utf8mb4'
+            )
+            
+            cursor = conn.cursor()
+            
+            # Insert training record
+            sql = """INSERT INTO trained_models 
+                     (model_name, model_type, model_path, training_date, 
+                      total_videos, accident_videos, normal_videos, 
+                      accuracy, loss, epochs, batch_size, learning_rate, 
+                      feature_shape, notes, is_active) 
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            
+            values = (
+                Path(output_model).name,
+                'LSTM',
+                output_model,
+                datetime.now(),
+                len(X),
+                int(np.sum(y == 1)),
+                int(np.sum(y == 0)),
+                float(best_acc),
+                float(avg_loss),
+                epochs,
+                batch_size,
+                lr,
+                str(X.shape),
+                f'Trained with {len(X)} videos. Accident: {np.sum(y == 1)}, Normal: {np.sum(y == 0)}',
+                True
+            )
+            
+            cursor.execute(sql, values)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            print(f"✓ Training data saved to database")
+    except Exception as e:
+        print(f"Warning: Could not save to database: {e}")
 
 
 if __name__ == "__main__":

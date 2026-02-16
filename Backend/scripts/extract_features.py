@@ -74,11 +74,11 @@ def process_dataset(dataset_dir, output_file):
     X = []
     y = []
     
-    # Process accident videos
+    # Process accident videos - NO LIMIT
     accident_dir = dataset_dir / "accident"
     if accident_dir.exists():
         print(f"\nProcessing accident videos from {accident_dir}...")
-        video_files = list(accident_dir.glob("*.mp4"))[:53]  # Limit to 53 videos
+        video_files = list(accident_dir.glob("*.mp4"))
         for video_path in video_files:
             print(f"  {video_path.name}")
             features = extract_features_from_video(video_path, model)
@@ -87,11 +87,12 @@ def process_dataset(dataset_dir, output_file):
     else:
         print(f"Warning: {accident_dir} not found")
     
-    # Process normal videos
+    # Process normal videos - NO LIMIT
     normal_dir = dataset_dir / "no_accident"
     if normal_dir.exists():
         print(f"\nProcessing normal videos from {normal_dir}...")
-        for video_path in normal_dir.glob("*.mp4"):
+        video_files = list(normal_dir.glob("*.mp4"))
+        for video_path in video_files:
             print(f"  {video_path.name}")
             features = extract_features_from_video(video_path, model)
             X.append(features)

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     
     GROQ_API_KEY: str = ""
     
+    USE_GPU: bool = True
+    
     @property
     def cors_origins(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]

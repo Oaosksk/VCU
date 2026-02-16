@@ -23,14 +23,24 @@ class YOLODetector:
         try:
             logger.info(f"Loading YOLOv8 model from {self.model_path}")
             from ultralytics import YOLO
+            import torch
 
             if not self.model_path.exists():
                 logger.warning(f"Model not found at {self.model_path}, downloading...")
                 self.model = YOLO('yolov8s.pt')
             else:
                 self.model = YOLO(str(self.model_path))
-
-            logger.info("YOLOv8 model loaded successfully")
+            
+            # Set device based on config
+            if settings.USE_GPU and torch.cuda.is_available():
+                self._device = 'cuda'
+                logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                self._device = 'cpu'
+                logger.info("Using CPU for inference")
+            
+            self.model.to(self._device)
+            logger.info(f"YOLOv8 model loaded successfully on {self._device}")
         except ImportError:
             logger.error("ultralytics package not installed")
             raise RuntimeError("ultralytics package required. Install with: pip install ultralytics")

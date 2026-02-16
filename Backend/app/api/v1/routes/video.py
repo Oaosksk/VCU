@@ -79,10 +79,24 @@ async def analyze_video(request: VideoAnalyzeRequest, db: Session = Depends(get_
         # Update status to processing
         crud.update_video_status(db, request.video_id, "processing")
 
-        result = await analyze_video_file(request.video_id)
+        result = await analyze_video_file(request.video_id, db)
 
         # Save analysis result to database
         crud.create_analysis_result(db, result)
+        
+        # Save accident frames to database if any
+        if result["status"] == "accident" and result.get("details", {}).get("accidentFrameUrls"):
+            frame_urls = result["details"]["accidentFrameUrls"]
+            frames_data = [
+                {
+                    'index': int(url.split('_')[-1].split('.')[0]),  # Extract frame index from URL
+                    'path': url,
+                    'confidence': 1.0
+                }
+                for url in frame_urls
+            ]
+            if frames_data:
+                crud.create_accident_frames(db, request.video_id, result["id"], frames_data)
 
         # Save detected events to database
         event_frames = result.get("details", {}).get("eventFrames", [])
@@ -159,3 +173,33 @@ async def get_explanation(result_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Explanation generation failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate explanation: {str(e)}")
+
+
+
+@router.get("/frames/{video_id}")
+async def get_video_frames(video_id: str, db: Session = Depends(get_db)):
+    """Get accident frames for a specific video"""
+    try:
+        # Get frames from database
+        frames = crud.get_accident_frames_by_video(db, video_id)
+        
+        if not frames:
+            return {"video_id": video_id, "frames": [], "count": 0}
+        
+        frame_data = [
+            {
+                "index": frame.frame_index,
+                "url": frame.frame_path,
+                "confidence": frame.confidence
+            }
+            for frame in frames
+        ]
+        
+        return {
+            "video_id": video_id,
+            "frames": frame_data,
+            "count": len(frame_data)
+        }
+    except Exception as e:
+        logger.error(f"Failed to get frames for video {video_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get frames: {str(e)}")

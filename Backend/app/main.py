@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,13 @@ app.add_middleware(
 
 # Include routers
 app.include_router(video.router, prefix="/api", tags=["video"])
+
+# Mount static file directories for serving frames and clips
+Path("./storage/frames").mkdir(parents=True, exist_ok=True)
+Path("./storage/clips").mkdir(parents=True, exist_ok=True)
+app.mount("/frames", StaticFiles(directory="./storage/frames"), name="frames")
+app.mount("/clips", StaticFiles(directory="./storage/clips"), name="clips")
+
 
 
 @app.on_event("startup")

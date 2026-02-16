@@ -23,7 +23,7 @@ function App() {
         setUploadedFile(file)
         setCurrentState(APP_STATES.PROCESSING)
         showToast('Uploading video...', 'info')
-        
+
         // Call real API
         await uploadAndAnalyze(
             file,
@@ -74,8 +74,8 @@ function App() {
                 return (
                     <ProcessingState
                         fileName={uploadedFile?.name}
-                        onComplete={() => {}} // Handled by uploadAndAnalyze callback
-                        onError={() => {}} // Handled by uploadAndAnalyze callback
+                        onComplete={() => { }} // Handled by uploadAndAnalyze callback
+                        onError={() => { }} // Handled by uploadAndAnalyze callback
                     />
                 )
 
@@ -83,6 +83,7 @@ function App() {
                 return (
                     <ResultState
                         result={analysisResult}
+                        file={uploadedFile} // Pass the original file
                         onViewExplanation={handleViewExplanation}
                         onReset={handleReset}
                     />

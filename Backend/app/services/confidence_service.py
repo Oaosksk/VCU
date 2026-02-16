@@ -174,7 +174,7 @@ class TemporalConfidenceAggregator:
         
         return consistency_score
     
-    def _detect_event_frames(self, confidences, threshold=0.6):
+    def _detect_event_frames(self, confidences, threshold=0.7):
         """
         Detect frames where accident event likely occurred
         

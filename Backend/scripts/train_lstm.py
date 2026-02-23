@@ -56,6 +56,12 @@ def train_model(features_file, output_model, epochs=50, batch_size=16, lr=0.001)
     
     print(f"Dataset: {X.shape}, Labels: {y.shape}")
     
+    # Check if dataset is too small
+    if len(X) < 10:
+        print(f"\nWarning: Only {len(X)} videos found. Need at least 10 videos for training.")
+        print("Add more videos to dataset/accident/ and dataset/no_accident/")
+        return
+    
     # Split dataset
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
@@ -129,7 +135,7 @@ def train_model(features_file, output_model, epochs=50, batch_size=16, lr=0.001)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
             torch.save(model.state_dict(), output_model)
-            print(f" ✓ Best model saved!")
+            print(f" [BEST]")
         else:
             print()
     
@@ -140,41 +146,27 @@ def train_model(features_file, output_model, epochs=50, batch_size=16, lr=0.001)
     
     # Save to database
     try:
-        import pymysql
+        import sqlite3
         from app.core.config import settings
         
-        # Parse DATABASE_URL
         db_url = settings.DATABASE_URL
-        if 'mysql+pymysql://' in db_url:
-            db_url = db_url.replace('mysql+pymysql://', '')
-            parts = db_url.split('@')
-            user_pass = parts[0].split(':')
-            host_db = parts[1].split('/')
-            host_port = host_db[0].split(':')
-            
-            conn = pymysql.connect(
-                host=host_port[0],
-                user=user_pass[0],
-                password=user_pass[1] if len(user_pass) > 1 else '',
-                database=host_db[1],
-                charset='utf8mb4'
-            )
-            
+        if 'sqlite:///' in db_url:
+            db_path = db_url.replace('sqlite:///', '')
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
-            # Insert training record
             sql = """INSERT INTO trained_models 
                      (model_name, model_type, model_path, training_date, 
                       total_videos, accident_videos, normal_videos, 
                       accuracy, loss, epochs, batch_size, learning_rate, 
                       feature_shape, notes, is_active) 
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             
             values = (
                 Path(output_model).name,
                 'LSTM',
                 output_model,
-                datetime.now(),
+                datetime.now().isoformat(),
                 len(X),
                 int(np.sum(y == 1)),
                 int(np.sum(y == 0)),
@@ -185,15 +177,14 @@ def train_model(features_file, output_model, epochs=50, batch_size=16, lr=0.001)
                 lr,
                 str(X.shape),
                 f'Trained with {len(X)} videos. Accident: {np.sum(y == 1)}, Normal: {np.sum(y == 0)}',
-                True
+                1
             )
             
             cursor.execute(sql, values)
             conn.commit()
             cursor.close()
             conn.close()
-            
-            print(f"✓ Training data saved to database")
+            print(f"Training data saved to database")
     except Exception as e:
         print(f"Warning: Could not save to database: {e}")
 

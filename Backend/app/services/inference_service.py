@@ -5,7 +5,7 @@ import numpy as np
 import logging
 import time
 
-INFERENCE_TIMEOUT_SECONDS = 120  # Abort analysis after 2 minutes
+INFERENCE_TIMEOUT_SECONDS = 1800  # Abort analysis after 30 minutes
 
 
 from app.services.video_service import get_video_path

@@ -54,9 +54,10 @@ def extract_features_from_video(video_path, model, target_fps=10, max_frames=150
     return np.array(features[:max_frames])
 
 
-def process_dataset(dataset_dir, output_file):
+def process_dataset(dataset_dir, output_file, skip_processed=True):
     """Process entire dataset"""
     dataset_dir = Path(dataset_dir)
+    cache_file = Path('processed_videos.pkl')
     
     if not dataset_dir.exists():
         print(f"Error: Dataset directory '{dataset_dir}' not found!")
@@ -68,22 +69,41 @@ def process_dataset(dataset_dir, output_file):
         print("        └── video1.mp4")
         return
     
-    print("Loading YOLOv8 model...")
-    model = YOLO('yolov8s.pt')
-    
+    # Load existing features and processed videos list
     X = []
     y = []
+    processed_videos = set()
+    
+    if skip_processed and cache_file.exists():
+        print(f"Loading cached features from {cache_file}...")
+        with open(cache_file, 'rb') as f:
+            cache = pickle.load(f)
+            X = cache.get('X', []).tolist() if len(cache.get('X', [])) > 0 else []
+            y = cache.get('y', []).tolist() if len(cache.get('y', [])) > 0 else []
+            processed_videos = cache.get('processed', set())
+        print(f"Loaded {len(X)} previously processed videos")
+    
+    print("Loading YOLOv8 model...")
+    model = YOLO('yolov8s.pt')
     
     # Process accident videos - NO LIMIT
     accident_dir = dataset_dir / "accident"
     if accident_dir.exists():
         print(f"\nProcessing accident videos from {accident_dir}...")
         video_files = list(accident_dir.glob("*.mp4"))
+        new_count = 0
         for video_path in video_files:
-            print(f"  {video_path.name}")
+            video_id = f"accident/{video_path.name}"
+            if video_id in processed_videos:
+                print(f"  {video_path.name} (skipped - already processed)")
+                continue
+            print(f"  {video_path.name} (processing...)")
             features = extract_features_from_video(video_path, model)
             X.append(features)
             y.append(1)
+            processed_videos.add(video_id)
+            new_count += 1
+        print(f"Processed {new_count} new accident videos")
     else:
         print(f"Warning: {accident_dir} not found")
     
@@ -92,11 +112,19 @@ def process_dataset(dataset_dir, output_file):
     if normal_dir.exists():
         print(f"\nProcessing normal videos from {normal_dir}...")
         video_files = list(normal_dir.glob("*.mp4"))
+        new_count = 0
         for video_path in video_files:
-            print(f"  {video_path.name}")
+            video_id = f"no_accident/{video_path.name}"
+            if video_id in processed_videos:
+                print(f"  {video_path.name} (skipped - already processed)")
+                continue
+            print(f"  {video_path.name} (processing...)")
             features = extract_features_from_video(video_path, model)
             X.append(features)
             y.append(0)
+            processed_videos.add(video_id)
+            new_count += 1
+        print(f"Processed {new_count} new normal videos")
     else:
         print(f"Warning: {normal_dir} not found")
     
@@ -115,10 +143,16 @@ def process_dataset(dataset_dir, output_file):
     print(f"Accident videos: {np.sum(y == 1)}")
     print(f"Normal videos: {np.sum(y == 0)}")
     
+    # Save features
     with open(output_file, 'wb') as f:
         pickle.dump({'X': X, 'y': y}, f)
     
+    # Save cache
+    with open(cache_file, 'wb') as f:
+        pickle.dump({'X': X, 'y': y, 'processed': processed_videos}, f)
+    
     print(f"\n✓ Features saved to {output_file}")
+    print(f"✓ Cache saved to {cache_file}")
 
 
 if __name__ == "__main__":
@@ -126,6 +160,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default='dataset', help='Dataset directory')
     parser.add_argument('--output', default='features.pkl', help='Output file')
+    parser.add_argument('--reprocess', action='store_true', help='Reprocess all videos (ignore cache)')
     args = parser.parse_args()
     
-    process_dataset(args.dataset, args.output)
+    process_dataset(args.dataset, args.output, skip_processed=not args.reprocess)

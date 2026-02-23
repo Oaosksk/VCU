@@ -32,6 +32,8 @@ class FrameExtractor:
 
             original_fps = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
             # Validate FPS
             if original_fps <= 0:
@@ -57,6 +59,13 @@ class FrameExtractor:
                 raise ValueError("Video contains no frames.")
 
             frame_interval = max(1, int(original_fps / self.target_fps))
+            
+            # Resize large videos for faster processing
+            target_width = 640
+            should_resize = width > target_width
+            if should_resize:
+                scale = target_width / width
+                target_height = int(height * scale)
 
             frames = []
             frame_count = 0
@@ -69,6 +78,8 @@ class FrameExtractor:
 
                 if frame_count % frame_interval == 0:
                     if frame is not None and frame.size > 0:
+                        if should_resize:
+                            frame = cv2.resize(frame, (target_width, target_height))
                         frames.append(frame)
                         extracted += 1
 

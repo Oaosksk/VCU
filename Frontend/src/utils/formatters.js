@@ -4,7 +4,7 @@
  * @returns {string} - Formatted percentage
  */
 export const formatConfidence = (confidence) => {
-    return `${(confidence * 100).toFixed(1)}%`
+    return `${confidence}%`
 }
 
 /**
@@ -56,7 +56,7 @@ export const truncateText = (text, maxLength = 50) => {
  * @returns {string} - Confidence level label
  */
 export const getConfidenceLevel = (confidence) => {
-    if (confidence >= 0.8) return 'High'
-    if (confidence >= 0.5) return 'Medium'
+    if (confidence >= 91) return 'High'
+    if (confidence >= 30) return 'Medium'
     return 'Low'
 }

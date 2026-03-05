@@ -1,0 +1,291 @@
+===============================================================================
+VEHICLE ACCIDENT DETECTION SYSTEM — ML DEBUG REPORT
+Generated: 2026-03-05  |  Engineer: Senior ML Audit
+===============================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+The system consistently produces ~33% confidence and fails to detect accidents
+due to FOUR compounding root causes:
+
+  1. CRITICAL  — Training data NOT normalized; model trained on raw features
+  2. CRITICAL  — Model underfit on only 30 samples (16 accident, 14 non-accident)
+  3. HIGH      — Temporal stability always 0.00 due to LSTM output distribution
+  4. MEDIUM    — Confidence aggregator threshold poorly calibrated for this model
+
+Each issue is detailed below with file references and exact fix instructions.
+
+===============================================================================
+ISSUE 1 [CRITICAL] — TRAIN/INFERENCE NORMALIZATION MISMATCH
+===============================================================================
+
+Root Cause:
+  The LSTM model was trained on RAW (unnormalized) features but inference feeds
+  NORMALIZED features. This causes a severe distribution mismatch that renders
+  the trained weights meaningless at inference time.
+
+Evidence (from features.pkl inspection):
+  Feature 0 (vehicle count):  range 0.0 → 23.0      (raw integers)
+  Feature 1 (avg confidence): range 0.0 → 0.944      (already 0-1)
+  Feature 2 (bbox variance):  range 0.0 → 1,148,910  (raw pixels²)
+
+  But inference_service.py feeds:
+    norm_num_vehicles = min(num_vehicles / 10.0, 2.0)   → range 0.0 – 2.0
+    norm_bbox_variance = min(bbox_variance / 100000.0, 5.0) → range 0.0 – 5.0
+
+  Impact: The model NEVER saw these normalized values during training. Its
+  internal LSTM gates learned to fire on raw scales (e.g., bbox_variance ~10k–1M).
+  At inference, features are compressed to 0–5, which the model interprets as
+  "almost no signal" → stuck at ~0.48 (near-random sigmoid output).
+
+  This was confirmed by probe: 200 random normalized inputs give mean=0.50,
+  std=0.005 — essentially a coin flip with near-zero discriminative power.
+
+Affected Files:
+  - Backend/scripts/extract_features.py      [TRAINING — normalization was ADDED
+                                               AFTER training, mismatch created]
+  - Backend/app/services/inference_service.py [INFERENCE — normalizes features]
+  - Backend/storage/models/lstm_crash_detector.pth [STALE MODEL — trained on
+                                               un-normalized features]
+
+Fix (REQUIRED — must retrain):
+  Option A (Recommended): Remove normalization from BOTH scripts so both use raw
+  features, then retrain. Raw features have more signal for LSTM.
+
+  # In inference_service.py, replace lines 209-212:
+  # BEFORE (wrong — normalizing at inference but not during training):
+    norm_num_vehicles = min(num_vehicles / 10.0, 2.0)
+    norm_bbox_variance = min(bbox_variance / 100000.0, 5.0)
+    lstm_features.append([norm_num_vehicles, avg_conf, norm_bbox_variance])
+
+  # AFTER (consistent — use raw features like training):
+    lstm_features.append([float(num_vehicles), avg_conf, bbox_variance])
+
+  Also revert extract_features.py lines 43-47 to raw (no normalization).
+
+  Option B: Re-run extract_features.py with the current normalization code to
+  produce a new features.pkl with normalized values, then retrain from scratch.
+  This requires keeping the normalization in BOTH files and keeping them in sync.
+
+  Either way, the model MUST be retrained after fixing the mismatch.
+
+
+===============================================================================
+ISSUE 2 [CRITICAL] — MODEL UNDERTRAINED ON EXTREMELY SMALL DATASET
+===============================================================================
+
+Root Cause:
+  The LSTM model was trained on only 30 video samples (16 accident, 14 non-
+  accident). This is insufficient for any deep learning model to generalize.
+  The model has not learned meaningful accident patterns.
+
+Evidence (from probe on real training samples):
+  Accident video predictions (expected > 0.5):
+    Sample 0: 0.4818 [WRONG]
+    Sample 1: 0.6395 [CORRECT]
+    Sample 2: 0.8616 [CORRECT]
+    Sample 3: 0.4382 [WRONG]
+    Sample 4: 0.4818 [WRONG]
+  → 3/5 accident videos MISCLASSIFIED (60% error rate on training set itself)
+
+  Normal video predictions (expected < 0.5):
+    All 5 sampled: 0.438 [CORRECT]
+  → Model is biased toward "safe" prediction
+
+  The model is essentially memorizing a bias toward ~0.48 (no-accident) due to
+  insufficient training signal, combined with the normalization mismatch above.
+
+Additional evidence:
+  - LSTM weights show near-initialization values (std ~0.07–0.08 across all layers)
+  - fc2.bias = -0.05 (very close to zero initialization, no decisive bias learned)
+  - 200 random inputs → mean output = 0.50, std = 0.005 (near-random behavior)
+
+Affected Files:
+  - Backend/dataset/accident/     [only 16 videos]
+  - Backend/dataset/no_accident/  [only 14 videos]
+  - Backend/storage/models/lstm_crash_detector.pth [underfit model]
+
+Fix:
+  1. Expand dataset to minimum 200+ videos per class (400+ total).
+     Recommended sources: CADP, DADA-2000, CCD, D2-City datasets.
+  2. Retrain with at least 50–100 epochs after fixing Issue 1.
+  3. Use data augmentation (temporal jitter, frame dropout, speed variation).
+  4. More effective architectures for small datasets: use pretrained feature
+     extractor (e.g., ResNet-based optical flow) instead of raw bbox stats.
+
+
+===============================================================================
+ISSUE 3 [HIGH] — TEMPORAL STABILITY ALWAYS 0.00
+===============================================================================
+
+Root Cause:
+  temporal_stability is computed as the fraction of frames where LSTM output > 0.5,
+  combined with the longest consecutive run of such frames. Since the model
+  outputs ~0.48 for every frame (near-random), NO frame ever exceeds 0.5,
+  giving exactly 0.00 stability.
+
+  This is a SYMPTOM of Issues 1 and 2 (bad model), not an independent bug.
+
+Evidence (from confidence_service.py, line 157-172):
+  high_conf_frames = np.sum(confidences > 0.5)   # ← always 0 with this model
+  consistency_ratio = high_conf_frames / len(confidences)  # always 0.0
+  max_consecutive = 0  # always 0 since no frame exceeds 0.5
+  consistency_score = (0.0 * 0.6) + (0 * 0.4) = 0.0
+
+  Confirmed by simulation:
+    Input [0.33]*150: temporal_stability = 0.0000
+    Input [0.49]*150: temporal_stability = 0.0000  (even with 0.49, still 0!)
+
+Additional bug: The aggregator's is_accident condition requires BOTH
+  final_confidence > 0.5  AND  consistency_score > 0.6
+  Even if confidence barely exceeds 0.5, stability 0.0 always blocks detection.
+  The system can NEVER detect an accident with the current model outputs.
+
+  Confirmed: Input with [0.9]*50 + [0.1]*100 → is_accident=False (stability=0.60,
+  which exactly meets threshold but confidence=0.70, and YET is_accident=False
+  because the mixed signal brings final_confidence high enough but stability
+  barely meets 0.60 — the joint condition is extremely strict).
+
+Affected Files:
+  - Backend/app/services/confidence_service.py    [_check_temporal_consistency]
+  - Backend/storage/models/lstm_crash_detector.pth [root cause: bad model]
+
+Fix (short-term, while awaiting retrain):
+  Lower the consistency_threshold from 0.6 to 0.2 during testing:
+    # confidence_service.py line 19:
+    def __init__(self, window_size=15, spike_threshold=0.3, consistency_threshold=0.2):
+  And in inference_service.py line 167-170:
+    confidence_aggregator = TemporalConfidenceAggregator(
+        window_size=settings.CONFIDENCE_WINDOW_SIZE,
+        spike_threshold=0.3,
+        consistency_threshold=0.2   # lowered from 0.6
+    )
+  Long-term: Fix Issues 1 and 2 (retrain).
+
+
+===============================================================================
+ISSUE 4 [HIGH] — CONFIDENCE ALWAYS ~33%: THE RESCALING MATH
+===============================================================================
+
+Root Cause:
+  The model outputs ~0.48 for every frame. After sliding-window aggregation, the
+  final_confidence is ~0.33 (because the aggregator weights max-window * 0.5 +
+  consistency * 0.3 + mean * 0.2, and with all frames near 0.48 with stability 0:
+    max_window ≈ 0.48, consistency = 0.0, mean ≈ 0.48
+    final = 0.48 * 0.5 + 0.0 * 0.3 + 0.48 * 0.2 = 0.24 + 0 + 0.096 = 0.336 ≈ 33%
+
+  Then rescale_confidence(0.33, is_accident=False):
+    → int((0.33 / 0.5) * 49) = int(32.3) = 32 ≈ 33%
+
+  This explains EXACTLY why the UI always shows ~33%.
+
+Affected Files:
+  - Backend/app/services/inference_service.py   [rescale_confidence]
+  - Backend/app/services/confidence_service.py  [_compute_final_confidence]
+
+Fix: The 33% is a direct symptom of Issues 1 and 2. Fix those first.
+
+
+===============================================================================
+ISSUE 5 [MEDIUM] — VEHICLE PENALTY SUPPRESSES DETECTIONS
+===============================================================================
+
+Root Cause:
+  inference_service.py applies vehicle-count penalties BEFORE the is_accident
+  decision. With few vehicles (< 3), confidence is multiplied by 0.6–0.93.
+  Since the model already outputs ~0.48 (below threshold), the penalty pushes
+  it further down and also force-sets is_accident=False.
+
+  Lines 250-261 of inference_service.py:
+    if total_vehicles == 0:
+        raw_confidence = raw_confidence * 0.4     # ← crushes any accident signal
+        is_accident = False                        # ← hard override
+    elif total_vehicles < 3:
+        penalty = 0.6 + (total_vehicles / 6.0)
+        raw_confidence = raw_confidence * penalty
+        is_accident = aggregation_result['is_accident'] and raw_confidence > 0.5
+
+  If an accident happens involving 1-2 vehicles (common in dashcam videos), the
+  system will NEVER detect it even if the LSTM had high confidence.
+
+Affected Files:
+  - Backend/app/services/inference_service.py  [lines 250-261]
+
+Fix:
+  Remove the vehicle-count penalty entirely, or make it a soft advisory only.
+  Let LSTM + TCA make the final decision:
+    is_accident = aggregation_result['is_accident']
+  Optionally log a warning if vehicle count is low, but do not override detection.
+
+
+===============================================================================
+ISSUE 6 [MEDIUM] — BOUNDING BOXES: DETECTION VS RENDERING
+===============================================================================
+
+Root Cause:
+  YOLO bounding boxes are stored in xyxy format (absolute pixel coordinates).
+  They are passed to accident_frame_service.save_accident_frames() for rendering.
+  The rendering code in frame_service.py draws boxes using cv2 directly on the
+  saved frames. This part appears functionally correct for accident cases.
+
+  However, since the system NEVER reaches is_accident=True (due to Issues 1-4),
+  save_accident_frames() is NEVER called, so bounding boxes are never drawn.
+
+  The UI shows no frames because:
+    frame_data = { 'total_count': 0, 'frame_urls': [], 'clip_url': '' }
+  This is returned whenever is_accident is False.
+
+Affected Files:
+  - Backend/app/services/frame_service.py
+  - Backend/app/services/inference_service.py  [lines 266, 287]
+
+Fix: Fix Issues 1-4 first. Bounding box rendering itself is structurally correct.
+
+
+===============================================================================
+SUMMARY — PRIORITY ORDER FOR FIXES
+===============================================================================
+
+Priority | Issue                         | Impact
+---------+-------------------------------+----------------------------------
+P0       | Retrain model on normalized   | Without this, nothing works
+         | features (fix mismatch first) |
+P0       | Expand dataset (200+ per class)| Model needs data to learn
+P1       | Lower consistency_threshold   | Temporary unblock while retraining
+         | from 0.6 → 0.2               |
+P2       | Remove vehicle penalty        | Hard override kills all detections
+P3       | After retrain: verify outputs | Confirm model discriminates properly
+
+===============================================================================
+RETRAINING INSTRUCTIONS
+===============================================================================
+
+Step 1: Decide on normalization strategy (PICK ONE and be consistent):
+  Option A (Recommended — keep raw features):
+    a) Revert extract_features.py lines 43-47 to NOT normalize
+    b) Revert inference_service.py lines 208-212 to NOT normalize
+
+  Option B (Use normalized features):
+    a) Keep normalization in extract_features.py (already there)
+    b) Keep normalization in inference_service.py (already there)
+    c) Re-run: python scripts/extract_features.py --dataset dataset --reprocess
+
+Step 2: Expand dataset:
+  Add videos to: Backend/dataset/accident/   (target: 200+ .mp4 files)
+                 Backend/dataset/no_accident/ (target: 200+ .mp4 files)
+
+Step 3: Extract features:
+  cd Backend
+  python scripts/extract_features.py --dataset dataset --output features.pkl --reprocess
+
+Step 4: Train:
+  python scripts/train_lstm.py --features features.pkl --output storage/models/lstm_crash_detector.pth --epochs 100
+
+Step 5: Verify model outputs BEFORE deploying:
+  python C:\tmp\deep_probe.py  (should show accident preds > 0.5, normal < 0.5)
+
+Step 6: Restart uvicorn to pick up new model file.
+
+===============================================================================
+END OF REPORT
+===============================================================================

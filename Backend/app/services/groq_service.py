@@ -62,24 +62,30 @@ class GroqService:
         status = result.get("status", "unknown")
         confidence = result.get("confidence", 0)
         details = result.get("details", {})
-        
+        severity = result.get("severity", details.get("severity", "unknown"))
+        accident_type = result.get("accidentType", details.get("accidentType", "N/A"))
+        reasoning = result.get("reasoning", details.get("reasoning", ""))
+
         prompt = f"""Analyze this vehicle accident detection result:
 
 Status: {status}
-Confidence: {confidence:.2%}
+Confidence: {confidence}%
+Severity: {severity}
+Accident Type: {accident_type}
 Spatial Features: {details.get('spatialFeatures', 'N/A')}
 Temporal Features: {details.get('temporalFeatures', 'N/A')}
 Frames Analyzed: {details.get('frameCount', 'N/A')}
 Duration: {details.get('duration', 'N/A')}
+System Reasoning: {reasoning}
 
 Provide a detailed explanation covering:
 1. Spatial Analysis - What the model detected in the video frames
 2. Temporal Analysis - Movement patterns and sequences observed
 3. Model Architecture - Brief explanation of YOLOv8 + LSTM approach
-4. Confidence Score - What the {confidence:.2%} confidence means
+4. Confidence Score - What the {confidence}% confidence means
 
 Keep it technical but accessible. Use markdown formatting with headers."""
-        
+
         return prompt
     
     def _fallback_explanation(self, result: dict) -> str:
@@ -91,7 +97,7 @@ Keep it technical but accessible. Use markdown formatting with headers."""
         return f"""# Analysis Explanation
 
 ## Overview
-Based on the spatio-temporal analysis, our model detected: **{status}** with {confidence:.2%} confidence.
+Based on the spatio-temporal analysis, our model detected: **{status}** with {confidence}% confidence.
 
 ## Spatial Analysis
 The YOLOv8 object detection model analyzed individual frames to identify vehicles, their positions, and spatial relationships.
@@ -112,7 +118,7 @@ Our hybrid approach combines:
 ## Analysis Details
 - **Frames Analyzed:** {details.get('frameCount', 'N/A')}
 - **Video Duration:** {details.get('duration', 'N/A')}
-- **Confidence Score:** {confidence:.2%}
+- **Confidence Score:** {confidence}%
 
 The confidence score represents the model's certainty in this classification, derived from spatial and temporal feature analysis."""
 

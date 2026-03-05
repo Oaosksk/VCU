@@ -2,11 +2,24 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from ultralytics import YOLO
 import pickle
 import sys
+import torch
+from ultralytics import YOLO
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def _load_yolo(model_path='yolov8s.pt'):
+    """Load YOLO with PyTorch 2.6+ compatibility patch."""
+    _orig = torch.load
+    torch.load = lambda *a, **kw: _orig(*a, **{**kw, 'weights_only': False})
+    try:
+        model = YOLO(model_path)
+    finally:
+        torch.load = _orig
+    return model
+
 
 def extract_features_from_video(video_path, model, target_fps=10, max_frames=150):
     """Extract YOLOv8 features from video"""
@@ -40,7 +53,17 @@ def extract_features_from_video(video_path, model, target_fps=10, max_frames=150
                 avg_conf = 0.0
                 bbox_variance = 0.0
             
-            features.append([num_vehicles, avg_conf, bbox_variance])
+            # ── Fixed Z-score normalization (same constants used in inference_service.py)
+            # Statistics derived from dataset: keep these in sync with inference_service.py
+            VEHICLE_MEAN, VEHICLE_STD = 2.5, 3.0     # typical dashcam vehicle counts
+            CONF_MEAN,    CONF_STD    = 0.4, 0.25    # YOLO confidence
+            VAR_MEAN,     VAR_STD     = 50000.0, 150000.0  # bbox pixel² variance
+            
+            norm_vehicles = (num_vehicles - VEHICLE_MEAN) / VEHICLE_STD
+            norm_conf     = (avg_conf     - CONF_MEAN)    / CONF_STD
+            norm_var      = (bbox_variance - VAR_MEAN)    / VAR_STD
+            
+            features.append([norm_vehicles, norm_conf, norm_var])
             extracted += 1
         
         frame_count += 1
@@ -84,7 +107,7 @@ def process_dataset(dataset_dir, output_file, skip_processed=True):
         print(f"Loaded {len(X)} previously processed videos")
     
     print("Loading YOLOv8 model...")
-    model = YOLO('yolov8s.pt')
+    model = _load_yolo('yolov8s.pt')
     
     # Process accident videos - NO LIMIT
     accident_dir = dataset_dir / "accident"

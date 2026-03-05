@@ -3,37 +3,19 @@ import { formatFileSize } from '../../utils/fileValidation'
 
 const FileDropzone = ({ onFileSelect, accept, maxSize }) => {
     const [isDragging, setIsDragging] = useState(false)
+    const [selectedFile, setSelectedFile] = useState(null)
     const fileInputRef = useRef(null)
 
-    const handleDragOver = (e) => {
-        e.preventDefault()
-        setIsDragging(true)
-    }
-
-    const handleDragLeave = (e) => {
-        e.preventDefault()
-        setIsDragging(false)
-    }
-
+    const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true) }
+    const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false) }
     const handleDrop = (e) => {
-        e.preventDefault()
-        setIsDragging(false)
-
+        e.preventDefault(); setIsDragging(false)
         const files = e.dataTransfer.files
-        if (files.length > 0) {
-            onFileSelect(files[0])
-        }
+        if (files.length > 0) { setSelectedFile(files[0]); onFileSelect(files[0]) }
     }
-
     const handleFileInput = (e) => {
         const files = e.target.files
-        if (files.length > 0) {
-            onFileSelect(files[0])
-        }
-    }
-
-    const handleClick = () => {
-        fileInputRef.current?.click()
+        if (files.length > 0) { setSelectedFile(files[0]); onFileSelect(files[0]) }
     }
 
     return (
@@ -41,82 +23,109 @@ const FileDropzone = ({ onFileSelect, accept, maxSize }) => {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={handleClick}
-            className={`
-        border-2 border-dashed rounded-xl p-12 text-center cursor-pointer
-        transition-all duration-300
-        ${isDragging
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-slate-600 hover:border-blue-500 hover:bg-slate-800/50'
-                }
-      `}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+                border: `2px dashed ${isDragging ? '#38bdf8' : 'rgba(148, 163, 184, 0.18)'}`,
+                borderRadius: '20px',
+                padding: '56px 32px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                background: isDragging
+                    ? 'rgba(56, 189, 248, 0.06)'
+                    : 'rgba(15, 23, 42, 0.4)',
+                boxShadow: isDragging ? '0 0 40px rgba(56, 189, 248, 0.12), inset 0 0 40px rgba(56, 189, 248, 0.04)' : 'none',
+                position: 'relative',
+                overflow: 'hidden',
+            }}
         >
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept={accept}
-                onChange={handleFileInput}
-                className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept={accept} onChange={handleFileInput} style={{ display: 'none' }} />
 
-            <div className="flex flex-col items-center gap-4">
-                {/* Upload Icon */}
-                <div className={`
-          w-16 h-16 rounded-full flex items-center justify-center
-          ${isDragging
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-gray-400'
-                    }
-          transition-all duration-300
-        `}>
-                    <svg
-                        className="w-8 h-8"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                        />
+            {/* Animated corner accents when dragging */}
+            {isDragging && (
+                <>
+                    {['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].map((pos) => (
+                        <div key={pos} style={{
+                            position: 'absolute',
+                            width: 24, height: 24,
+                            borderColor: '#38bdf8',
+                            borderStyle: 'solid',
+                            borderWidth: 0,
+                            ...(pos === 'topLeft' ? { top: 12, left: 12, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 6 } :
+                                pos === 'topRight' ? { top: 12, right: 12, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 6 } :
+                                    pos === 'bottomLeft' ? { bottom: 12, left: 12, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 6 } :
+                                        { bottom: 12, right: 12, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 6 })
+                        }} />
+                    ))}
+                </>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                {/* Icon */}
+                <div style={{
+                    width: 72, height: 72, borderRadius: '20px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isDragging
+                        ? 'linear-gradient(135deg, rgba(56,189,248,0.25), rgba(99,102,241,0.25))'
+                        : 'rgba(30, 41, 59, 0.8)',
+                    border: `1px solid ${isDragging ? 'rgba(56,189,248,0.4)' : 'rgba(148,163,184,0.1)'}`,
+                    transition: 'all 0.3s ease',
+                    boxShadow: isDragging ? '0 0 30px rgba(56,189,248,0.2)' : 'none',
+                }}>
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
+                        stroke={isDragging ? '#38bdf8' : 'rgba(148,163,184,0.6)'}
+                        strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transition: 'stroke 0.3s' }}>
+                        <polyline points="16 16 12 12 8 16" />
+                        <line x1="12" y1="12" x2="12" y2="21" />
+                        <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
                     </svg>
                 </div>
 
                 {/* Text */}
                 <div>
-                    <p className="text-lg font-semibold text-white mb-1">
-                        {isDragging ? 'Drop video here' : 'Drop video here or click to browse'}
+                    <p style={{
+                        margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 700,
+                        color: isDragging ? '#38bdf8' : 'white',
+                        transition: 'color 0.3s',
+                    }}>
+                        {isDragging ? 'Release to upload' : 'Drop your video here'}
                     </p>
-                    <p className="text-sm text-gray-400">
-                        Supported formats: MP4, AVI, MOV
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'rgba(148,163,184,0.5)' }}>
+                        or click to browse files
                     </p>
-                    {maxSize && (
-                        <p className="text-xs text-gray-500 mt-1">
-                            Maximum file size: {formatFileSize(maxSize)}
-                        </p>
-                    )}
                 </div>
 
-                {/* Upload Button Visual */}
-                <div className="mt-2">
-                    <span className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors">
-                        <svg
-                            className="w-5 h-5 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                            />
-                        </svg>
-                        Select Video
-                    </span>
+                {/* CTA button */}
+                <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 24px', borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                    color: 'white', fontSize: '0.85rem', fontWeight: 600,
+                    boxShadow: '0 0 20px rgba(14,165,233,0.25)',
+                    pointerEvents: 'none',
+                }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Select Video
+                </div>
+
+                {/* Format + size info */}
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {['MP4', 'AVI', 'MOV', 'MKV'].map(fmt => (
+                        <span key={fmt} style={{
+                            padding: '3px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700,
+                            background: 'rgba(56,189,248,0.08)', color: 'rgba(56,189,248,0.6)',
+                            border: '1px solid rgba(56,189,248,0.12)', letterSpacing: '0.06em',
+                        }}>{fmt}</span>
+                    ))}
+                    {maxSize && (
+                        <span style={{ fontSize: '0.72rem', color: 'rgba(148,163,184,0.35)', alignSelf: 'center' }}>
+                            Max {formatFileSize(maxSize)}
+                        </span>
+                    )}
                 </div>
             </div>
         </div>

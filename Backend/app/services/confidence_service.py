@@ -1,6 +1,5 @@
 """Temporal Confidence Aggregation - Novel Contribution"""
 import numpy as np
-from collections import deque
 import logging
 
 logger = logging.getLogger(__name__)
@@ -174,7 +173,7 @@ class TemporalConfidenceAggregator:
         
         return consistency_score
     
-    def _detect_event_frames(self, confidences, threshold=0.7):
+    def _detect_event_frames(self, confidences, threshold=0.5):
         """
         Detect frames where accident event likely occurred
         

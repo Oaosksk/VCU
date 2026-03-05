@@ -35,9 +35,9 @@ export const STATUS_TYPES = {
 
 // Confidence Thresholds
 export const CONFIDENCE_THRESHOLDS = {
-    HIGH: 0.8,
-    MEDIUM: 0.5,
-    LOW: 0.3
+    HIGH: 91,
+    MEDIUM: 30,
+    LOW: 0
 }
 
 // Toast Types

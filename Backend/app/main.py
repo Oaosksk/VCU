@@ -1,6 +1,7 @@
 """FastAPI application entry point"""
 import logging
 import shutil
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Query, Depends
@@ -22,34 +23,9 @@ setup_logging(
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    debug=settings.DEBUG,
-)
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
-
-# Include routers
-app.include_router(video.router, prefix="/api", tags=["video"])
-
-# Mount static file directories for serving frames and clips
-Path("./storage/frames").mkdir(parents=True, exist_ok=True)
-Path("./storage/clips").mkdir(parents=True, exist_ok=True)
-app.mount("/frames", StaticFiles(directory="./storage/frames"), name="frames")
-app.mount("/clips", StaticFiles(directory="./storage/clips"), name="clips")
-
-
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app):
     """Initialize database and validate configuration on startup"""
     logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
     logger.info("Debug mode: %s", settings.DEBUG)
@@ -70,8 +46,43 @@ async def startup_event():
     if not lstm_path.exists():
         logger.warning("LSTM model not found at %s", lstm_path)
 
-    # Ensure upload directory exists
+    # Ensure upload, frames, clips directories exist
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.FRAMES_DIR).mkdir(parents=True, exist_ok=True)
+    Path(settings.CLIPS_DIR).mkdir(parents=True, exist_ok=True)
+
+    yield  # Application runs here
+
+    logger.info("Shutting down %s", settings.APP_NAME)
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG,
+    lifespan=lifespan,
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(video.router, prefix="/api", tags=["video"])
+
+# Mount static directories (directories are created by lifespan before any requests)
+Path("./storage/frames").mkdir(parents=True, exist_ok=True)
+Path("./storage/clips").mkdir(parents=True, exist_ok=True)
+try:
+    app.mount("/frames", StaticFiles(directory="./storage/frames"), name="frames")
+    app.mount("/clips",  StaticFiles(directory="./storage/clips"),  name="clips")
+except Exception as _e:
+    logging.getLogger(__name__).warning("Static mount skipped: %s", _e)
 
 
 @app.get("/")

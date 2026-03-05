@@ -68,7 +68,7 @@ class LSTMDetector:
                 raise FileNotFoundError(f"LSTM model not found at {model_path}")
 
             self.model = AccidentLSTM().to(self.device)
-            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
             self.model.eval()
             logger.info(f"LSTM model loaded from {model_path}")
             return True

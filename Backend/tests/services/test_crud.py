@@ -2,7 +2,7 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.db.models import Base, Video, AnalysisResult, Event
+from app.db.models import Base, Video, AnalysisResult, AccidentEvent
 from app.db import crud
 
 
@@ -88,13 +88,13 @@ class TestCreateEvents:
             "status": "accident", "confidence": 0.9
         })
 
-        events = crud.create_events(db_session, "v1", "result-v1", [(10, 25), (40, 55)])
+        events = crud.create_accident_events(db_session, "v1", "result-v1", [(10, 25), (40, 55)])
         assert len(events) == 2
         assert events[0].start_frame == 10
         assert events[1].end_frame == 55
 
     def test_empty_events(self, db_session):
-        events = crud.create_events(db_session, "v1", "r1", [])
+        events = crud.create_accident_events(db_session, "v1", "r1", [])
         assert events == []
 
 

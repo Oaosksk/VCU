@@ -1,4 +1,5 @@
 """File validation utilities (mirrors frontend/utils/fileValidation.js)"""
+import math
 from app.utils.constants import FILE_CONFIG
 
 
@@ -23,13 +24,14 @@ def validate_video_file(filename: str, file_size: int) -> dict:
     return {"valid": True, "error": None}
 
 
-def format_file_size(bytes: int) -> str:
+def format_file_size(size_bytes: int) -> str:
     """Formats file size to human-readable format"""
-    if bytes == 0:
+    if size_bytes == 0:
         return "0 Bytes"
     
     k = 1024
     sizes = ["Bytes", "KB", "MB", "GB"]
-    i = int((len(str(bytes)) - 1) / 3)
+    i = int(math.floor(math.log(size_bytes) / math.log(k)))
+    i = min(i, len(sizes) - 1)
     
-    return f"{round(bytes / (k ** i), 2)} {sizes[i]}"
+    return f"{round(size_bytes / (k ** i), 2)} {sizes[i]}"

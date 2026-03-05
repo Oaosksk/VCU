@@ -2,7 +2,6 @@
 name = "accident-detection-backend"
 version = "1.0.0"
 description = "Vehicle crash detection system using YOLOv8 + LSTM"
-readme = "README.md"
 requires-python = ">=3.11,<3.12"
 
 dependencies = [
@@ -11,11 +10,13 @@ dependencies = [
     "python-multipart==0.0.6",
     "sqlalchemy==2.0.25",
     "pymysql==1.1.0",
-    "torch==2.2.0",
-    "torchvision==0.17.0",
+    "mysql-connector-python==8.3.0",
+    "torch==2.2.0+cu118",
+    "torchvision==0.17.0+cu118",
     "ultralytics==8.1.0",
     "opencv-python==4.9.0.80",
     "numpy==1.26.3",
+    "scikit-learn==1.4.0",
     "python-dotenv==1.0.0",
     "pydantic==2.5.3",
     "pydantic-settings==2.1.0",
@@ -29,6 +30,9 @@ dev = [
     "httpx==0.26.0",
     "ruff==0.1.11",
 ]
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu118"
 
 [build-system]
 requires = ["hatchling"]

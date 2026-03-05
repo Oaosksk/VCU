@@ -1,5 +1,6 @@
 """Video upload and analysis routes"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 import uuid
@@ -19,8 +20,17 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory cache for fast explanation lookups (DB is the source of truth)
-results_cache = {}
+# In-memory LRU cache for fast explanation lookups (DB is the source of truth)
+_CACHE_MAX_SIZE = 100
+results_cache: OrderedDict = OrderedDict()
+
+
+def _cache_put(key: str, value: dict):
+    """Add to cache with LRU eviction."""
+    results_cache[key] = value
+    results_cache.move_to_end(key)
+    while len(results_cache) > _CACHE_MAX_SIZE:
+        results_cache.popitem(last=False)
 
 
 @router.post("/upload", response_model=VideoUploadResponse)
@@ -101,13 +111,13 @@ async def analyze_video(request: VideoAnalyzeRequest, db: Session = Depends(get_
         # Save detected events to database
         event_frames = result.get("details", {}).get("eventFrames", [])
         if event_frames:
-            crud.create_events(db, request.video_id, result["id"], event_frames)
+            crud.create_accident_events(db, request.video_id, result["id"], event_frames)
 
         # Update video status
         crud.update_video_status(db, request.video_id, "completed")
 
-        # Cache result for fast explanation lookups
-        results_cache[result["id"]] = result
+        # Cache result for fast explanation lookups (LRU-evicted)
+        _cache_put(result["id"], result)
         logger.info(f"Analysis complete. Result saved: {result['id']}")
 
         return VideoAnalyzeResponse(
@@ -115,7 +125,13 @@ async def analyze_video(request: VideoAnalyzeRequest, db: Session = Depends(get_
             status=result["status"],
             confidence=result["confidence"],
             timestamp=result["timestamp"],
-            details=result["details"]
+            details=result["details"],
+            inference_time=result.get("inference_time"),
+            isAccident=result.get("isAccident", False),
+            accidentType=result.get("accidentType"),
+            severity=result.get("severity", "none"),
+            frameEvidence=result.get("frameEvidence", ""),
+            reasoning=result.get("reasoning", ""),
         )
     except HTTPException:
         raise
@@ -156,9 +172,10 @@ async def get_explanation(result_id: str, db: Session = Depends(get_db)):
                     detail="Result not found. Please analyze the video first."
                 )
             # Reconstruct result dict from DB record
+            # NOTE: AnalysisResult has 'is_accident' (int), NOT 'status' (str)
             result = {
                 "id": db_result.id,
-                "status": db_result.status,
+                "status": "accident" if db_result.is_accident else "no_accident",
                 "confidence": db_result.confidence,
                 "details": db_result.details or {},
                 "inference_time": db_result.inference_time,

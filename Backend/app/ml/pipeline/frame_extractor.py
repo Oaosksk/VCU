@@ -25,10 +25,14 @@ class FrameExtractor:
             RuntimeError: If an unexpected error occurs during extraction.
         """
         try:
-            cap = cv2.VideoCapture(str(video_path))
+            # Convert Path to string with proper OS separators
+            video_path_str = str(Path(video_path).resolve())
+            logger.info(f"Opening video file: {video_path_str}")
+            logger.info(f"File exists check: {Path(video_path_str).exists()}")
+            cap = cv2.VideoCapture(video_path_str)
 
             if not cap.isOpened():
-                raise ValueError(f"Cannot open video file: {video_path}. File may be corrupted or use an unsupported codec.")
+                raise ValueError(f"Cannot open video file: {video_path_str}. File may be corrupted or use an unsupported codec.")
 
             original_fps = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -105,10 +109,11 @@ class FrameExtractor:
     def get_video_info(self, video_path: Path) -> dict:
         """Get video metadata with error handling"""
         try:
-            cap = cv2.VideoCapture(str(video_path))
+            video_path_str = str(Path(video_path).resolve())
+            cap = cv2.VideoCapture(video_path_str)
 
             if not cap.isOpened():
-                raise ValueError(f"Cannot open video: {video_path}")
+                raise ValueError(f"Cannot open video: {video_path_str}")
 
             fps = cap.get(cv2.CAP_PROP_FPS)
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

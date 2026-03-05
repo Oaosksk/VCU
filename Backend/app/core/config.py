@@ -14,12 +14,18 @@ class Settings(BaseSettings):
     
     UPLOAD_DIR: str = "./storage/uploads"
     MODEL_DIR: str = "./storage/models"
+    FRAMES_DIR: str = "./storage/frames"
+    CLIPS_DIR: str = "./storage/clips"
     MAX_UPLOAD_SIZE: int = 524_288_000
     
-    YOLO_MODEL_PATH: str = "./storage/models/yolov8s.pt"
+    YOLO_MODEL_PATH: str = "./yolov8s.pt"
     LSTM_MODEL_PATH: str = "./storage/models/lstm_crash_detector.pth"
     CONFIDENCE_WINDOW_SIZE: int = 15
     CONFIDENCE_THRESHOLD: float = 0.75
+    
+    INFERENCE_TIMEOUT: int = 1800
+    LSTM_WINDOW_SIZE: int = 30
+    MAX_INFERENCE_FRAMES: int = 150
     
     TARGET_FPS: int = 10
     MAX_VIDEO_DURATION: int = 300

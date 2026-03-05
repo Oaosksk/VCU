@@ -24,12 +24,25 @@ class YOLODetector:
             logger.info(f"Loading YOLOv8 model from {self.model_path}")
             from ultralytics import YOLO
             import torch
+            from functools import partial
 
-            if not self.model_path.exists():
-                logger.warning(f"Model not found at {self.model_path}, downloading...")
-                self.model = YOLO('yolov8s.pt')
-            else:
-                self.model = YOLO(str(self.model_path))
+            # PyTorch 2.6+ defaults weights_only=True, but ultralytics 8.1.0
+            # calls torch.load internally without overriding this, causing
+            # "Unsupported global: DetectionModel" errors.
+            # Temporarily patch torch.load to allow unsafe loading for the
+            # trusted YOLO checkpoint.
+            _original_load = torch.load
+            torch.load = partial(_original_load, weights_only=False)
+
+            try:
+                if not self.model_path.exists():
+                    logger.warning(f"Model not found at {self.model_path}, downloading...")
+                    self.model = YOLO('yolov8s.pt')
+                else:
+                    self.model = YOLO(str(self.model_path))
+            finally:
+                # Always restore original torch.load
+                torch.load = _original_load
             
             # Set device based on config
             if settings.USE_GPU and torch.cuda.is_available():
@@ -90,6 +103,10 @@ class YOLODetector:
 
             logger.error(f"Detection failed: {str(e)}")
             raise RuntimeError(f"YOLO detection failed: {str(e)}")
+
+    def get_device(self) -> str:
+        """Get current device being used"""
+        return self._device if self._device else "not loaded"
 
     def cleanup(self):
         """Release GPU memory"""

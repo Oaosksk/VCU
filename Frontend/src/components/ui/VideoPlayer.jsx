@@ -10,19 +10,10 @@ const VideoPlayer = ({ clipUrl, baseUrl }) => {
 
     const fullUrl = `${baseUrl}${clipUrl}`
 
-    const togglePlay = () => {
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause()
-            } else {
-                videoRef.current.play()
-            }
-            setIsPlaying(!isPlaying)
+    const handlePlay = () => {
+        if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play()
         }
-    }
-
-    const handleVideoEnd = () => {
-        setIsPlaying(false)
     }
 
     return (
@@ -57,8 +48,9 @@ const VideoPlayer = ({ clipUrl, baseUrl }) => {
                     ref={videoRef}
                     src={fullUrl}
                     className="w-full h-auto"
-                    onEnded={handleVideoEnd}
-                    onClick={togglePlay}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => setIsPlaying(false)}
                     controls
                 >
                     Your browser does not support the video tag.
@@ -67,10 +59,12 @@ const VideoPlayer = ({ clipUrl, baseUrl }) => {
                 {/* Play overlay (visible when paused) */}
                 {!isPlaying && (
                     <div
-                        className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer"
-                        onClick={togglePlay}
+                        className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer pointer-events-none"
                     >
-                        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
+                        <div
+                            className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors pointer-events-auto"
+                            onClick={handlePlay}
+                        >
                             <svg
                                 className="w-8 h-8 text-white ml-1"
                                 fill="currentColor"

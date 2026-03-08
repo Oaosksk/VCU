@@ -322,6 +322,17 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
             size_p90        = float(np.percentile(size_arr, 90))    if len(size_arr) > 0 else 0.0
             size_score      = min(size_p90 / 0.5, 1.0)              # 50% size change = 1.0
 
+            # Per-frame combined physics score (for frame selection later)
+            n = len(per_frame_vehicles)
+            motion_padded = [0.0] + motion_scores + [0.0] * (n - len(motion_scores) - 1)
+            size_padded   = [0.0] + size_change_scores + [0.0] * (n - len(size_change_scores) - 1)
+            per_frame_physics = [
+                overlap_scores[i] * 0.55 +
+                min(motion_padded[i] / 80.0, 1.0) * 0.30 +
+                min(size_padded[i] / 0.5,   1.0) * 0.15
+                for i in range(n)
+            ]
+
             # Final physics score: weighted combination
             physics_score = (
                 max_overlap  * 0.45 +   # vehicle collision (strongest signal)
@@ -425,20 +436,28 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
         if is_accident and event_frames:
             logger.info(f"Saving accident frames for video: {video_id}")
 
-            # Save frames to disk
+            # Get per-frame physics if available (from physics analysis path)
+            _per_frame_physics = per_frame_physics if 'per_frame_physics' in dir() else []
+            try:    _per_frame_physics = per_frame_physics
+            except NameError: _per_frame_physics = []
+
+            # Save frames to disk (uses physics peak for exact frame selection)
             save_result = accident_frame_service.save_accident_frames(
                 video_id=video_id,
                 frames=frames,
                 event_frames=event_frames,
-                detections_per_frame=detections_per_frame
+                detections_per_frame=detections_per_frame,
+                per_frame_physics=_per_frame_physics,
             )
 
-            # Generate accident-only video clip
+            # Generate annotated accident clip around collision peak
             clip_path = accident_frame_service.generate_accident_clip(
                 video_id=video_id,
                 frames=frames,
                 event_frames=event_frames,
-                fps=video_info.get('fps', 10.0)
+                fps=video_info.get('fps', 10.0),
+                detections_per_frame=detections_per_frame,
+                per_frame_physics=_per_frame_physics,
             )
 
             # Get URLs

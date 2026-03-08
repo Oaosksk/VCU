@@ -1,4 +1,4 @@
-"""YOLOv8 detector wrapper with GPU memory management"""
+"""YOLOv11 detector wrapper with GPU memory management"""
 from pathlib import Path
 from typing import List, Dict
 import cv2
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class YOLODetector:
-    """YOLOv8 object detector for vehicle detection"""
+    """YOLOv11 object detector for vehicle detection"""
 
     def __init__(self):
         self.model = None
@@ -21,7 +21,7 @@ class YOLODetector:
     def load_model(self):
         """Load YOLOv8 model"""
         try:
-            logger.info(f"Loading YOLOv8 model from {self.model_path}")
+            logger.info(f"Loading YOLOv11 model from {self.model_path}")
             from ultralytics import YOLO
             import torch
             from functools import partial
@@ -36,12 +36,11 @@ class YOLODetector:
 
             try:
                 if not self.model_path.exists():
-                    logger.warning(f"Model not found at {self.model_path}, downloading...")
-                    self.model = YOLO('yolov8s.pt')
+                    logger.info("YOLO model not found locally — downloading YOLOv11m (~40 MB)...")
+                    self.model = YOLO('yolo11m.pt')   # YOLOv11 medium — best speed/accuracy balance
                 else:
                     self.model = YOLO(str(self.model_path))
             finally:
-                # Always restore original torch.load
                 torch.load = _original_load
             
             # Set device based on config
@@ -53,7 +52,7 @@ class YOLODetector:
                 logger.info("Using CPU for inference")
             
             self.model.to(self._device)
-            logger.info(f"YOLOv8 model loaded successfully on {self._device}")
+            logger.info(f"YOLOv11m loaded successfully on {self._device}")
         except ImportError:
             logger.error("ultralytics package not installed")
             raise RuntimeError("ultralytics package required. Install with: pip install ultralytics")

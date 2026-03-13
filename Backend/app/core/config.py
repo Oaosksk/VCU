@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     
     INFERENCE_TIMEOUT: int = 1800
     LSTM_WINDOW_SIZE: int = 30
-    MAX_INFERENCE_FRAMES: int = 150
+    MAX_INFERENCE_FRAMES: int = 100
     
     TARGET_FPS: int = 10
-    MAX_VIDEO_DURATION: int = 300
+    MAX_VIDEO_DURATION: int = 600
     
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     

@@ -217,7 +217,7 @@ class TemporalConfidenceAggregator:
         if len(window_scores) == 0:
             return np.mean(confidences)
         
-        max_window_score = np.max(window_scores)
+        max_window_score = np.percentile(window_scores, 90)  # P90 — robust to single-window spikes
         mean_confidence = np.mean(confidences)
         
         # Weighted combination

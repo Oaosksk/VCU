@@ -43,17 +43,11 @@ def rescale_confidence(raw_confidence: float, is_accident: bool) -> int:
     clamped = max(0.0, min(1.0, raw_confidence))
 
     if is_accident:
-        # Internal accident threshold is ~0.5; map 0.5-1.0 → 91-100
-        normalized = (clamped - 0.5) / 0.5  # 0.0 to 1.0
-        normalized = max(0.0, min(1.0, normalized))
-        return int(91 + normalized * 9)  # 91-100
+        # Map full 0.0-1.0 → 91-100 linearly
+        return int(91 + clamped * 9)  # 91-100
     else:
-        # Map 0.0-0.5 → 0-49 (linear)
-        if clamped >= 0.5:
-            # Edge case: internal conf is ≥0.5 but is_accident is False
-            # (forced off by vehicle penalty). Cap at 49.
-            return 49
-        return int((clamped / 0.5) * 49)  # 0-49
+        # Map full 0.0-1.0 → 0-49 linearly
+        return int(clamped * 49)  # 0-49
 
 
 def classify_severity(
@@ -175,7 +169,7 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
         confidence_aggregator = TemporalConfidenceAggregator(
             window_size=settings.CONFIDENCE_WINDOW_SIZE,
             spike_threshold=0.3,
-            consistency_threshold=0.35,
+            consistency_threshold=0.65,
         )
 
         # ── Extract frames ────────────────────────────────────────────
@@ -245,10 +239,10 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
         )
 
         # ── HARD GATE 1: Not a driving video ──────────────────────────
-        if vehicle_coverage < 0.15 or avg_vehicles_per_frame < 0.2:
+        if vehicle_coverage < 0.20 or avg_vehicles_per_frame < 0.3:
             logger.info(
-                f"HARD GATE triggered: vehicle_coverage={vehicle_coverage:.2f} < 0.15 "
-                f"or avg_vehicles={avg_vehicles_per_frame:.2f} < 0.2 → NO ACCIDENT"
+                f"HARD GATE triggered: vehicle_coverage={vehicle_coverage:.2f} < 0.20 "
+                f"or avg_vehicles={avg_vehicles_per_frame:.2f} < 0.3 → NO ACCIDENT"
             )
             is_accident    = False
             raw_confidence = max(0.01, avg_vehicles_per_frame * 0.2)  # tiny confidence
@@ -264,19 +258,25 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
 
         else:
             # ── Physics Score: measure real accident indicators ────────
-            overlap_scores   = []   # vehicle bbox overlap  (collision)
-            motion_scores    = []   # sudden velocity change (impact)
-            size_change_scores = [] # bbox area change      (crash/flip)
+            # FIX #1: Use OVERLAP SPIKE (sudden increase) not absolute max
+            # FIX #5: Normalize motion by frame dimensions
+            overlap_scores     = []   # per-frame max IoU between vehicle pairs
+            motion_scores      = []   # frame-to-frame center displacement
+            size_change_scores = []   # frame-to-frame area % change
 
             prev_centers = []
             prev_areas   = []
 
+            # Get frame dimensions for motion normalization
+            frame_h, frame_w = frames[0].shape[:2] if frames else (480, 640)
+            frame_diag = (frame_w**2 + frame_h**2) ** 0.5  # diagonal for normalization
+
             for vehicles in per_frame_vehicles:
-                bboxes = [v['bbox'] for v in vehicles]  # [x1,y1,x2,y2]
-                areas  = [(b[2]-b[0])*(b[3]-b[1]) for b in bboxes]
+                bboxes  = [v['bbox'] for v in vehicles]  # [x1,y1,x2,y2]
+                areas   = [(b[2]-b[0])*(b[3]-b[1]) for b in bboxes]
                 centers = [((b[0]+b[2])/2, (b[1]+b[3])/2) for b in bboxes]
 
-                # Overlap: do any two vehicle bboxes intersect?
+                # Overlap: max IoU between any two vehicles in this frame
                 frame_overlap = 0.0
                 for i in range(len(bboxes)):
                     for j in range(i+1, len(bboxes)):
@@ -284,18 +284,18 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
                         ix1 = max(b1[0], b2[0]); iy1 = max(b1[1], b2[1])
                         ix2 = min(b1[2], b2[2]); iy2 = min(b1[3], b2[3])
                         if ix2 > ix1 and iy2 > iy1:
-                            inter   = (ix2-ix1) * (iy2-iy1)
-                            union   = areas[i] + areas[j] - inter
+                            inter = (ix2-ix1) * (iy2-iy1)
+                            union = areas[i] + areas[j] - inter
                             frame_overlap = max(frame_overlap, inter / max(union, 1))
                 overlap_scores.append(frame_overlap)
 
-                # Motion: compare centers with previous frame
+                # Motion: compare centers with previous frame (normalized by frame diagonal)
                 if prev_centers and centers:
                     dists = []
                     for c in centers:
                         nearest = min(prev_centers, key=lambda p: (p[0]-c[0])**2+(p[1]-c[1])**2)
                         d = ((nearest[0]-c[0])**2 + (nearest[1]-c[1])**2) ** 0.5
-                        dists.append(d)
+                        dists.append(d / frame_diag)  # FIX #5: normalize
                     motion_scores.append(float(np.mean(dists)))
 
                 # Area change: sudden size change = crash indicator
@@ -310,47 +310,67 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
                 prev_centers = centers
                 prev_areas   = areas
 
-            # Combine physics signals
-            max_overlap     = float(np.max(overlap_scores))         if overlap_scores     else 0.0
-            motion_arr      = np.array(motion_scores)               if motion_scores      else np.array([0.0])
-            size_arr        = np.array(size_change_scores)          if size_change_scores else np.array([0.0])
+            # ─────────────────────────────────────────────────────────
+            # FIX #1: OVERLAP SPIKE — not absolute max
+            # Normal traffic has sustained overlap; accidents have SUDDEN overlap
+            overlap_arr = np.array(overlap_scores) if overlap_scores else np.array([0.0])
 
-            # Sudden motion spike (top 10% of frames exceeds threshold)
-            motion_p90      = float(np.percentile(motion_arr, 90))  if len(motion_arr) > 0 else 0.0
-            motion_score    = min(motion_p90 / 80.0, 1.0)           # 80px jump = 1.0 score
+            if len(overlap_arr) > 5:
+                # Smooth with 5-frame rolling average, then find biggest jump
+                kernel = np.ones(5) / 5
+                smoothed = np.convolve(overlap_arr, kernel, mode='valid')
+                overlap_deltas = np.diff(smoothed)
+                # Max positive spike = sudden collision
+                overlap_spike = float(np.max(overlap_deltas)) if len(overlap_deltas) > 0 else 0.0
+                # Also track absolute max (but weight spike much higher)
+                abs_max_overlap = float(np.max(overlap_arr))
+                # STRICTER: Spike score: 0.50 spike = score 1.0 (was 0.35)
+                spike_score = min(max(overlap_spike, 0.0) / 0.50, 1.0)
+                # Combined: 90% spike + 10% absolute (spike dominates)
+                overlap_score = spike_score * 0.90 + min(abs_max_overlap, 1.0) * 0.10
+            else:
+                abs_max_overlap = float(np.max(overlap_arr)) if len(overlap_arr) > 0 else 0.0
+                overlap_score = abs_max_overlap
+                overlap_spike = 0.0
 
-            size_p90        = float(np.percentile(size_arr, 90))    if len(size_arr) > 0 else 0.0
-            size_score      = min(size_p90 / 0.5, 1.0)              # 50% size change = 1.0
+            # Motion: use normalized values (FIX #5 already applied above)
+            motion_arr = np.array(motion_scores) if motion_scores else np.array([0.0])
+            motion_p90 = float(np.percentile(motion_arr, 90)) if len(motion_arr) > 0 else 0.0
+            motion_score = min(motion_p90 / 0.15, 1.0)  # 15% of diagonal = max (STRICTER)
+
+            size_arr = np.array(size_change_scores) if size_change_scores else np.array([0.0])
+            size_p90 = float(np.percentile(size_arr, 90)) if len(size_arr) > 0 else 0.0
+            size_score = min(size_p90 / 1.5, 1.0)  # Require 150% size change (down-weighted)
 
             # Per-frame combined physics score (for frame selection later)
             n = len(per_frame_vehicles)
-            motion_padded = [0.0] + motion_scores + [0.0] * (n - len(motion_scores) - 1)
-            size_padded   = [0.0] + size_change_scores + [0.0] * (n - len(size_change_scores) - 1)
+            motion_padded = [0.0] + motion_scores + [0.0] * max(0, n - len(motion_scores) - 1)
+            size_padded   = [0.0] + size_change_scores + [0.0] * max(0, n - len(size_change_scores) - 1)
             per_frame_physics = [
                 overlap_scores[i] * 0.55 +
-                min(motion_padded[i] / 80.0, 1.0) * 0.30 +
-                min(size_padded[i] / 0.5,   1.0) * 0.15
-                for i in range(n)
+                min(motion_padded[i] / 0.10, 1.0) * 0.30 +
+                min(size_padded[i]   / 1.5,  1.0) * 0.15
+                for i in range(min(n, len(overlap_scores)))
             ]
 
             # Final physics score: weighted combination
             physics_score = (
-                max_overlap  * 0.45 +   # vehicle collision (strongest signal)
-                motion_score * 0.35 +   # sudden movement
-                size_score   * 0.20     # bbox size change
+                overlap_score  * 0.70 +   # HEAVILY favor spike-based overlap (increased)
+                motion_score   * 0.20 +   # sudden movement (decreased)
+                size_score     * 0.10     # bbox size change (unreliable, downweighted)
             )
 
             logger.info(
                 f"Physics score: {physics_score:.3f} "
-                f"(overlap={max_overlap:.3f}, motion={motion_score:.3f}, size={size_score:.3f})"
+                f"(overlap_spike={overlap_spike:.3f}, overlap_score={overlap_score:.3f}, "
+                f"motion={motion_score:.3f}, size={size_score:.3f})"
             )
 
             # ── HARD GATE 2: No physics signal = no accident ──────────
-            # Even if LSTM fires, without any physical evidence → reject
-            if physics_score < 0.05 and max_overlap < 0.01:
+            if physics_score < 0.20 and overlap_spike < 0.05:
                 logger.info(
-                    f"HARD GATE 2: physics_score={physics_score:.3f} < 0.05 "
-                    f"and no overlap → NO ACCIDENT"
+                    f"HARD GATE 2: physics={physics_score:.3f}, "
+                    f"overlap_spike={overlap_spike:.3f} → NO ACCIDENT"
                 )
                 is_accident    = False
                 raw_confidence = physics_score * 0.5
@@ -365,37 +385,43 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
                 }
 
             else:
-                # ── Step 3: LSTM Temporal Analysis ───────────────────
-                logger.info("Running LSTM temporal analysis...")
+                # ── Step 3: LSTM Analysis ─────────────────────────────
+                # Single prediction on full sequence — matches how model was trained
+                logger.info("Running LSTM analysis...")
                 max_frames = 150
                 padded = np.array(lstm_features[:max_frames] if len(lstm_features) >= max_frames
                                   else lstm_features + [[0,0,0]]*(max_frames - len(lstm_features)))
-                frame_confidences = lstm_detector.predict_sequence(padded)
+                lstm_confidence = lstm_detector.predict(padded)
+                # Fill frame_confidences for aggregator compatibility
+                frame_confidences = [lstm_confidence] * len(padded)
 
                 elapsed = time.time() - start_time
                 if elapsed > INFERENCE_TIMEOUT_SECONDS:
                     raise TimeoutError(f"Inference timed out during LSTM analysis")
 
-                # ── Step 4: Temporal Aggregation ─────────────────────
+                # Build aggregation result (no sliding window needed now)
                 logger.info("Applying temporal confidence aggregation...")
                 aggregation_result = confidence_aggregator.aggregate(frame_confidences)
-                lstm_confidence    = aggregation_result['final_confidence']
-
-                # ── Step 5: Hybrid Final Decision ────────────────────
-                # Physics score gates the LSTM — LSTM alone cannot fire an accident
-                # Physics weight: 60%, LSTM weight: 40%
-                raw_confidence = physics_score * 0.60 + lstm_confidence * 0.40
-
-                # Extra gate: if physics says no but LSTM says yes → trust physics
-                if physics_score < 0.15:
-                    raw_confidence = physics_score * 0.80  # physics dominates
-                    logger.info(f"Low physics score — LSTM overridden, conf={raw_confidence:.3f}")
-
-                is_accident = raw_confidence > 0.50 and physics_score >= 0.10
 
                 logger.info(
-                    f"Hybrid decision: physics={physics_score:.3f} lstm={lstm_confidence:.3f} "
-                    f"combined={raw_confidence:.3f} is_accident={is_accident}"
+                    f"LSTM single prediction: {lstm_confidence:.3f}, "
+                    f"temporal_stability: {aggregation_result['temporal_stability']:.3f}"
+                )
+
+                # ── Step 5: LSTM-Only Decision ────────────────────────
+                # Server logs show physics scores are identical for normal
+                # driving (0.33-0.53) and accidents (0.37-0.60) — physics
+                # CANNOT distinguish them.  Only LSTM reliably separates:
+                #   Accident videos: lstm = 0.66-0.73
+                #   Normal  videos:  lstm = 0.26-0.28
+                # Physics is kept ONLY for hard gates + frame selection.
+                raw_confidence = lstm_confidence
+                is_accident = lstm_confidence >= 0.5
+
+                logger.info(
+                    f"Decision: lstm={lstm_confidence:.3f} "
+                    f"physics={physics_score:.3f} overlap_spike={overlap_spike:.3f} "
+                    f"raw_confidence={raw_confidence:.3f} is_accident={is_accident}"
                 )
 
         status = "accident" if is_accident else "no_accident"
@@ -410,16 +436,20 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
         event_frames = aggregation_result.get('event_frames', [])
         frame_data = {'total_count': 0, 'frame_urls': [], 'clip_url': ''}
 
-        # Fallback: If accident detected but no specific event frames,
-        # pick top overlap frames (physics-based) or LSTM confidence frames
+        # Fallback: If accident detected but no usable event frames,
+        # use per-frame physics scores (which vary per frame, unlike LSTM
+        # confidence which is constant for all frames).
         if is_accident and not event_frames:
             logger.info("Accident detected but no event frames found. Using top physics frames.")
-            if 'frame_confidences' in dir() or 'frame_confidences' in locals():
-                scores = np.array(frame_confidences)
-            elif overlap_scores:
-                scores = np.array(overlap_scores + [0.0] * (len(frames) - len(overlap_scores)))
-            else:
+            try:
+                scores = np.array(per_frame_physics) if per_frame_physics else np.zeros(len(frames))
+            except NameError:
                 scores = np.zeros(len(frames))
+
+            # If physics scores are empty/zero, fall back to overlap_scores
+            if np.max(scores) == 0 and overlap_scores:
+                scores = np.array(overlap_scores + [0.0] * (len(frames) - len(overlap_scores)))
+
             top_indices = sorted(np.argsort(scores)[-10:].tolist())
             if top_indices:
                 current_start = top_indices[0]

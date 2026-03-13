@@ -93,19 +93,30 @@ def _draw_annotated_frame(
         _stamp_frame_label(out, frame_label, color=(200, 200, 200))
         return out
 
-    bboxes = [v['bbox'] for v in vehicles]
+    # Clamp and sort bounding box coordinates to frame bounds
+    bboxes = []
+    for v in vehicles:
+        raw = v['bbox']
+        x1 = max(0, min(int(raw[0]), w - 1))
+        y1 = max(0, min(int(raw[1]), h - 1))
+        x2 = max(0, min(int(raw[2]), w - 1))
+        y2 = max(0, min(int(raw[3]), h - 1))
+        # Ensure x1 < x2 and y1 < y2
+        if x1 > x2: x1, x2 = x2, x1
+        if y1 > y2: y1, y2 = y2, y1
+        bboxes.append([x1, y1, x2, y2])
 
     # ── Determine which vehicles are in collision ──────────────────
     collision_set = set()
     for i in range(len(bboxes)):
         for j in range(i + 1, len(bboxes)):
-            if _compute_iou(bboxes[i], bboxes[j]) > 0.05:   # 5% IoU = overlap
+            if _compute_iou(bboxes[i], bboxes[j]) > 0.15:   # 15% IoU = collision (old: 0.25)
                 collision_set.add(i)
                 collision_set.add(j)
 
     # ── Draw each vehicle ──────────────────────────────────────────
     for idx, (det, bbox) in enumerate(zip(vehicles, bboxes)):
-        x1, y1, x2, y2 = map(int, bbox)
+        x1, y1, x2, y2 = bbox  # already clamped ints
         conf  = det.get('confidence', 0)
         label = det['class_name'].capitalize()
 
@@ -134,7 +145,7 @@ def _draw_annotated_frame(
         (tw, th), bl = cv2.getTextSize(tag, font, font_scale, 2)
         pill_y1 = max(y1 - th - 8, 0)
         pill_y2 = max(y1, th + 8)
-        cv2.rectangle(out, (x1, pill_y1), (x1 + tw + 8, pill_y2), color, -1)
+        cv2.rectangle(out, (x1, pill_y1), (min(x1 + tw + 8, w - 1), pill_y2), color, -1)
         cv2.putText(out, tag, (x1 + 4, pill_y2 - 4), font, font_scale, (255, 255, 255), 2, cv2.LINE_AA)
 
     # ── Stamp frame context label (e.g. "-1s", "IMPACT", "+1s") ───

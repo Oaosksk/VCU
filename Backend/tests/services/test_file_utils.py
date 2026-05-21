@@ -9,6 +9,10 @@ class TestValidateVideoFile:
         assert result["valid"] is True
         assert result["error"] is None
 
+    def test_valid_without_reported_size(self):
+        result = validate_video_file("test.mp4", None)
+        assert result["valid"] is True
+
     def test_valid_avi(self):
         result = validate_video_file("test.avi", 1024)
         assert result["valid"] is True

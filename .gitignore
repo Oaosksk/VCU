@@ -1,28 +1,118 @@
-# ML Models & Data (Large Files)
+# =============================================================
+# PYTHON
+# =============================================================
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+
+# =============================================================
+# VIRTUAL ENVIRONMENTS
+# =============================================================
+venv/
+.venv/
+.uv/
+uv.lock
+
+# =============================================================
+# ENVIRONMENT VARIABLES
+# =============================================================
+.env
+.env.local
+.env.production
+.env.example
+
+# =============================================================
+# DATABASE
+# =============================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================================================
+# ML MODELS & TRAINING DATA
+# =============================================================
 *.pkl
 *.pt
 *.pth
 *.h5
 *.onnx
 yolov8*.pt
-
-# Dataset & Processing
+yolo11*.pt
 dataset/
-frames_output/
 features/
 checkpoints/
-
-# Generated Results
-results/
-output/
-*.csv
 experiments/
+frames_output/
 
-# Video Files
+# =============================================================
+# VIDEO FILES
+# =============================================================
 *.mp4
 *.avi
 *.mov
 *.mkv
 
-# Kaggle Downloads
+# =============================================================
+# STORAGE DIRECTORIES (keep folder structure via .gitkeep)
+# =============================================================
+Backend/storage/uploads/*
+!Backend/storage/uploads/.gitkeep
+Backend/storage/models/*
+!Backend/storage/models/.gitkeep
+Backend/storage/processed/*
+!Backend/storage/processed/.gitkeep
+Backend/storage/frames/*
+Backend/storage/clips/*
+Backend/storage/logs/*
+
+# =============================================================
+# LOGS
+# =============================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =============================================================
+# FRONTEND BUILD & DEPENDENCIES
+# =============================================================
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# =============================================================
+# RESULTS & OUTPUT
+# =============================================================
+results/
+output/
+*.csv
 kaggle-download/
+
+# =============================================================
+# EDITORS & OS
+# =============================================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =============================================================
+# TESTING
+# =============================================================
+.pytest_cache/
+.coverage
+
+# =============================================================
+# ARCHIVE (never commit archived files)
+# =============================================================
+archive/

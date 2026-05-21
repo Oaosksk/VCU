@@ -3,7 +3,7 @@ import math
 from app.utils.constants import FILE_CONFIG
 
 
-def validate_video_file(filename: str, file_size: int) -> dict:
+def validate_video_file(filename: str, file_size: int | None) -> dict:
     """Validates video file"""
     if not filename:
         return {"valid": False, "error": "No file provided"}
@@ -17,7 +17,7 @@ def validate_video_file(filename: str, file_size: int) -> dict:
         return {"valid": False, "error": f"Invalid file type. Allowed: {allowed}"}
     
     # Check size
-    if file_size > FILE_CONFIG["MAX_SIZE"]:
+    if file_size is not None and file_size > FILE_CONFIG["MAX_SIZE"]:
         max_mb = FILE_CONFIG["MAX_SIZE"] / (1024 * 1024)
         return {"valid": False, "error": f"File size exceeds {max_mb}MB limit"}
     

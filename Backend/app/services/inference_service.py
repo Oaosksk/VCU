@@ -11,6 +11,7 @@ INFERENCE_TIMEOUT_SECONDS = 1800  # Abort analysis after 30 minutes
 from app.services.video_service import get_video_path
 from app.ml.models.yolo_detector import YOLODetector
 from app.ml.models.lstm_model import LSTMDetector
+from app.ml.features import normalize_vehicle_features
 from app.ml.pipeline.frame_extractor import FrameExtractor
 # FramePreprocessor removed — not used in the current pipeline
 from app.services.confidence_service import TemporalConfidenceAggregator
@@ -204,14 +205,9 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
                 num_v, avg_conf, bbox_var = 0, 0.0, 0.0
 
             # Z-score normalization — identical constants to extract_features.py
-            V_MEAN, V_STD = 2.5, 3.0
-            C_MEAN, C_STD = 0.4, 0.25
-            B_MEAN, B_STD = 50000.0, 150000.0
-            lstm_features.append([
-                (num_v    - V_MEAN) / V_STD,
-                (avg_conf - C_MEAN) / C_STD,
-                (bbox_var - B_MEAN) / B_STD,
-            ])
+            lstm_features.append(
+                normalize_vehicle_features(num_v, avg_conf, bbox_var)
+            )
 
         logger.info(f"YOLO detection complete: {len(lstm_features)} frames")
         elapsed = time.time() - start_time
@@ -433,7 +429,7 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
         except NameError: overlap_scores = []
 
         # Step 6: Save Accident Events
-        event_frames = aggregation_result.get('event_frames', [])
+        event_frames = list(aggregation_result.get('event_frames', []))
         frame_data = {'total_count': 0, 'frame_urls': [], 'clip_url': ''}
 
         # Fallback: If accident detected but no usable event frames,
@@ -582,7 +578,7 @@ async def analyze_video_file(video_id: str, db=None) -> dict:
                 "duration": f"{video_info['duration']:.1f} seconds",
                 "temporalStability": round(float(aggregation_result['temporal_stability']), 3),
                 "spikeFiltered": bool(aggregation_result['spike_filtered']),
-                "eventFrames": [[int(start), int(end)] for start, end in aggregation_result['event_frames']],
+                "eventFrames": [[int(start), int(end)] for start, end in event_frames],
                 "maxConfidence": round(float(aggregation_result['max_confidence']), 3),
                 "meanConfidence": round(float(aggregation_result['mean_confidence']), 3),
                 "totalVehicles": total_vehicles,

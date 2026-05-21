@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTimestamp } from '../../utils/formatters'
 
 const S = {
@@ -173,7 +173,12 @@ const ResultState = ({ result, file, onViewExplanation, onReset }) => {
     )
 
     const isAccident = result.status === 'accident'
-    const videoUrl = file ? URL.createObjectURL(file) : null
+    const videoUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
+    useEffect(() => {
+        return () => {
+            if (videoUrl) URL.revokeObjectURL(videoUrl)
+        }
+    }, [videoUrl])
     const conf = result.confidence ?? 0
     const confColor = isAccident ? '#ef4444' : conf >= 30 ? '#f59e0b' : '#10b981'
     const confLabel = conf >= 91 ? 'High Confidence' : conf >= 30 ? 'Medium Confidence' : 'Low Confidence'

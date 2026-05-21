@@ -13,6 +13,7 @@ export const FILE_CONFIG = {
     ALLOWED_TYPES: {
         'video/mp4': ['.mp4'],
         'video/avi': ['.avi'],
+        'video/x-msvideo': ['.avi'],
         'video/quicktime': ['.mov'],
         'video/x-matroska': ['.mkv'],
     },

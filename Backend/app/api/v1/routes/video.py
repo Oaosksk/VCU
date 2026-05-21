@@ -51,6 +51,7 @@ async def upload_video(video: UploadFile = File(...), db: Session = Depends(get_
 
         # Save file to disk
         filepath = await save_uploaded_video(video, video_id)
+        file_size = video.size if video.size is not None else Path(filepath).stat().st_size
         logger.info(f"Video saved successfully: {filepath}")
 
         # Save video record to database
@@ -59,14 +60,14 @@ async def upload_video(video: UploadFile = File(...), db: Session = Depends(get_
             video_id=video_id,
             filename=video.filename,
             filepath=str(filepath),
-            size=video.size
+            size=file_size
         )
 
         return VideoUploadResponse(
             video_id=video_id,
             message="Video uploaded successfully",
             filename=video.filename,
-            size=video.size
+            size=file_size
         )
     except HTTPException:
         raise

@@ -21,6 +21,7 @@ import time
 import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from app.ml.features import normalize_vehicle_features
 
 # ── Paths ─────────────────────────────────────────────────────────
 ACCIDENT_DIR  = Path("dataset/Accident Videos")
@@ -29,12 +30,7 @@ ACCIDENT_PKL  = Path("features_accident.pkl")
 NORMAL_PKL    = Path("features_normal.pkl")
 FINAL_PKL     = Path("features.pkl")
 
-# ── Z-score constants — MUST match inference_service.py ──────────
-VEHICLE_MEAN, VEHICLE_STD = 2.5,     3.0
-CONF_MEAN,    CONF_STD    = 0.4,     0.25
-VAR_MEAN,     VAR_STD     = 50000.0, 150000.0
-
-
+# Feature normalization lives in app.ml.features and is shared with inference.
 def _load_yolo(model_path='yolo11m.pt'):
     """Load YOLO with PyTorch 2.6+ compatibility patch."""
     print(f"Loading YOLO model: {model_path}")
@@ -84,11 +80,7 @@ def extract_features_from_video(video_path, model, target_fps=10, max_frames=150
             else:
                 num_v, avg_conf, bbox_var = 0, 0.0, 0.0
 
-            norm_v   = (num_v    - VEHICLE_MEAN) / VEHICLE_STD
-            norm_c   = (avg_conf - CONF_MEAN)    / CONF_STD
-            norm_b   = (bbox_var - VAR_MEAN)     / VAR_STD
-
-            features.append([norm_v, norm_c, norm_b])
+            features.append(normalize_vehicle_features(num_v, avg_conf, bbox_var))
             extracted += 1
 
         frame_count += 1

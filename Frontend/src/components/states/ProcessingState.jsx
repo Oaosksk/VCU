@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import ProgressBar from '../ui/ProgressBar'
 import { PROCESSING_STAGES } from '../../utils/constants'
-import { useVideoUpload } from '../../hooks/useVideoUpload'
 
 const ProcessingState = ({ fileName, onComplete, onError }) => {
     const [currentStage, setCurrentStage] = useState(0)
     const [progress, setProgress] = useState(0)
-    const { uploadAndAnalyze, uploadProgress } = useVideoUpload()
 
     useEffect(() => {
         let stageIndex = 0
